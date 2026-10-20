@@ -65,3 +65,16 @@ HTML 시안의 가상 데이터를 앱의 실제 영상 데이터처럼 사용�
 7. 선택 가점(프로필 선택·URL 입력·즉석 생성·후보 영상 탐색)
 
 과제 PDF의 요구사항은 `.project/plan.md`에 대응시켰습니다. **원문 요구를 누락하지 않되 구현·검증 전에는 충족했다고 주장하지 않습니다.**
+
+---
+
+## 환경변수
+```
+YOUTUBE_API_KEY=발급받은_API_KEY
+
+GOOGLE_CLIENT_ID=발급받은_클라이언트_ID
+GOOGLE_CLIENT_SECRET=발급받은_클라이언트_보안_비밀번호
+
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5-coder:7b
+```
