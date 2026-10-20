@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
+from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -31,6 +32,32 @@ async def local_only(request: Request, call_next):
 @app.get('/api/health')
 def get_health():
     return services.health()
+
+
+class ResolveRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+
+
+@app.get('/api/videos')
+def get_videos():
+    videos, warnings = services.discover()
+    db.save_videos(videos)
+    return {'videos': [{**video, 'allowed': services.allowed(video)} for video in videos], 'warnings': warnings}
+
+
+@app.post('/api/videos/resolve')
+def resolve_video(body: ResolveRequest):
+    video = services.fetch_video(body.url)
+    db.save_videos([video])
+    return {**video, 'allowed': services.allowed(video)}
+
+
+@app.get('/api/videos/{video_id}')
+def get_video(video_id: str):
+    video = db.get_video(services.video_id(video_id))
+    if not video:
+        raise HTTPException(404, '영상이 없습니다.')
+    return {**video, 'allowed': services.allowed(video)}
 
 
 if (config.ROOT / 'dist').is_dir():

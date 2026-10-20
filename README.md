@@ -28,3 +28,8 @@ ollama list
 ## 기준
 
 과제 PDF(로컬 전용), `.project/plan.md`, `DESIGN.md`, `dashboard-preview.html`을 따릅니다. 현재 사용자 요청에 따라 광고 표시와 게시 승인을 적용합니다.
+
+### 영상 조회 검증
+- 실제 YouTube Data API로 지정 채널 5개 × 8개 = 40개 조회 성공.
+- Playwright MCP: 채널 필터 8개, 검색 빈 결과, 테스트 URL 상세 선택, 잘못된 호스트 URL 422 확인.
+- `npm.cmd run build` 통과. `artifacts/02-discovery.png` 저장.
