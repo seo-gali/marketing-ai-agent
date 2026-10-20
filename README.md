@@ -1,77 +1,75 @@
 # Marketing AI Agent
 
-지정된 YouTube 영상의 연애 고민을 분석하고, Ollama로 마케팅 댓글 **초안**을 생성·검토하는 Windows 로컬 대시보드입니다.
+지정 YouTube 채널의 영상 맥락을 Ollama로 분석하고, **사용자가 승인한 홍보 고지 댓글을 전용 Chrome 프로필로 자동 입력·게시·확인**하는 Windows 로컬 대시보드입니다.
 
-> **현재 상태: 기획·UI 시안만 작성됨.** React 앱, FastAPI 서버, YouTube 연동, Ollama 연동, SQLite 저장 및 E2E는 아직 구현되지 않았습니다.
+> **현재 상태: 기획·UI 시안만 제공.** React 앱, FastAPI, YouTube API, Ollama 연동, SQLite, Chrome 자동 게시 및 E2E는 아직 구현되지 않았습니다.
 
-## 개발 기준 문서
+## 문서 및 파일
 
-| 파일 | 용도 |
-| --- | --- |
-| `docs/reference/track-2-marketing-agent.pdf` | 사용자 제공 과제 원문. 구현 전 요구사항 대조 기준(로컬 제공, Git 추적 제외) |
-| `.project/plan.md` | 제품 범위, 과제와의 차이, 기술 구성, 기능·API·DB, 완료 기준 |
-| `DESIGN.md` | HelpNest 참조 스타일, 사이드바·목록·상세 패널, 반응형·상태 UI |
-| `AGENTS.md` | Codex가 항상 지킬 실행·검증 규칙 |
-| `dashboard-preview.html` | 독립 HTML UI 시안. 실제 서비스 코드가 아닌 디자인 참고 자료 |
-| `docs/preview-*-redesign.png` | 화면 크기별 시안 검토 자료 |
+| 파일 | 역할 |
+|---|---|
+| `docs/reference/track-2-marketing-agent.pdf` | 최초 제공 과제 원문(로컬 참고용, 공개 Git 제외) |
+| `.project/plan.md` | 기능·범위·제약·API/DB 초안·구현 순서·완료 기준 |
+| `DESIGN.md` | HelpNest 스타일 대시보드 레이아웃·상태·반응형 |
+| `AGENTS.md` | Codex 공통 작업 원칙 |
+| `dashboard-preview.html` | 독립 실행 가능한 **디자인 시안**. 외부 API나 실제 댓글 게시 기능 없음 |
+| `docs/preview-*-redesign.png` | 화면 크기별 시안 |
+| `.gitignore` | 비밀정보·Chrome 프로필·DB·실패 캡처 제외 |
 
-충돌 시 **현재 사용자 지시 → `.project/plan.md` → `DESIGN.md`(UI에 한정) → `AGENTS.md` → `README.md`** 순으로 판단합니다. 기능 범위의 기준은 `.project/plan.md`입니다.
+문서 우선순위: 현재 사용자 지시 → `.project/plan.md` → `DESIGN.md`(UI에 한정) → `AGENTS.md` → `README.md`.
 
-## 기술 구성
+## 기술 스택
 
-- React · TypeScript · Vite
-- Python · FastAPI
-- Ollama `qwen2.5-coder:7b` (이미 보유한 로컬 생성 모델 사용)
-- YouTube Data API v3 · SQLite
-- 브라우저 검토 흐름 및 Playwright E2E
-- `.env` 기반 설정. `qwen3-embedding:0.6b` 및 OpenAI API는 기본 구성에 사용하지 않음
+React · TypeScript · Vite / Python · FastAPI / Ollama `qwen2.5-coder:7b` / YouTube Data API v3 / SQLite / Playwright (Chrome 자동 게시 및 E2E) / `.env`
 
-## 시작 전 준비
+`qwen3-embedding:0.6b`, OpenAI API, RAG, Redis 등은 기본 구성에 포함하지 않습니다.
 
-1. Windows 11에 Node.js, Python, Ollama, Codex가 설치되어 있는지 확인합니다.
-2. `docs/reference/track-2-marketing-agent.pdf` 파일이 있는지 확인합니다. 원문은 `.gitignore`로 Git 업로드에서 제외되므로 다른 PC에서 Git clone 후에는 직접 복사해야 합니다.
-3. `ollama list`에서 `qwen2.5-coder:7b` 설치 여부를 확인합니다. 설치 여부를 추정하지 않습니다.
-4. YouTube Data API v3 사용 가능한 API 키를 준비합니다. 키는 **나중에 생성할** `.env`에 보관하고 Git에 포함하지 않습니다.
-5. `dashboard-preview.html`을 브라우저로 열어 확정된 UI 구조를 확인합니다. 현재 시연 데이터는 가상 데이터입니다.
-6. 이 디렉터리에서 Codex를 실행하고 아래 첫 요청을 전달합니다.
+## 현재 실행 가능한 것
+
+`dashboard-preview.html` 파일을 브라우저에서 열어 영상 선택, 가상 AI 분석, 초안 편집, 승인, **게시 단계 모의 시연**을 확인합니다. 가상 데이터는 실제 영상에서 추출한 결과가 아니며 **실제 게시를 수행하지 않습니다**.
+
+## 개발 환경 사전 확인
+
+1. Windows 11에서 Node.js, Python, Ollama, Codex 설치 여부를 확인합니다.
+2. `ollama list`에서 `qwen2.5-coder:7b`의 실제 설치 여부를 확인합니다.
+3. YouTube Data API v3 키를 준비합니다. 비밀 값은 `.env`로 관리합니다.
+4. `docs/reference/track-2-marketing-agent.pdf`가 있는지 확인합니다. 파일은 `.gitignore`로 공개 Git 추적에서 제외됩니다.
+5. Chrome 자동화를 위해 기본 개인 프로필과 분리된 전용 프로필 디렉터리를 사용하고, 로그인은 사용자가 직접 수행합니다.
 
 ## Codex 첫 요청
 
 ```text
-프로젝트 루트의 docs/reference/track-2-marketing-agent.pdf, .project/plan.md, DESIGN.md, AGENTS.md, README.md를 먼저 읽으세요.
-PDF를 요구사항의 원문으로 사용하되, .project/plan.md의 의도적인 범위 조정 및 현재 사용자 지시를 구분하세요.
-프로젝트는 현재 기획서와 독립 HTML 시안만 존재합니다. 실제 기능이 구현된 것으로 가정하지 마세요.
+프로젝트 루트의 docs/reference/track-2-marketing-agent.pdf, .project/plan.md, DESIGN.md, AGENTS.md, README.md를 읽으세요.
+현재는 기획 문서와 HTML 시안만 존재합니다. 구현된 기능이 있다고 가정하지 마세요.
 
-첫 작업 범위:
-- Windows 11에서 React/TypeScript/Vite와 Python/FastAPI의 로컬 실행 환경 구축
-- .env.example 작성 및 환경 변수 로딩·필수 값 오류 처리 구현
-- SQLite 연결 및 최소 초기화
-- Ollama(qwen2.5-coder:7b) 연결 상태 확인 기능 구현
-- YouTube Data API v3 인증·기본 연결 확인 기능 구현
-- README에 실제 검증된 실행 명령과 사전 준비 사항 작성
+최종 제품 범위는 영상 수집 → Ollama 분석 → 댓글 초안·수정·승인 → Playwright 전용 Chrome 프로필 자동 입력·게시·실제 확인 → 이력입니다.
+수동 게시로 대체하지 마세요. 단, 시청자 위장·자동 계정 순환·광고 고지 누락은 금지합니다.
 
-제약:
-- DESIGN.md와 dashboard-preview.html의 최신 HelpNest형 사이드바 + 영상 목록 + 우측 상세 패널 구조를 유지할 것
-- UI 시안의 가상 영상·분석 결과를 실제 서비스 데이터로 복사하지 말 것
-- 댓글 생성·게시 기능 등 첫 작업 외 기능은 미리 구현하지 말 것
-- 실제 로컬 실행 경로를 검증하고 검증 명령, 통과/실패, 제약을 보고할 것
-- 접근 불가능한 외부 API 키 또는 환경이 있으면 연결 검증을 통과했다고 주장하지 말 것
-- 사용자 요청 없이 배포, Git push, 외부 서비스 쓰기 작업은 하지 말 것
+이번 첫 작업만 수행하세요.
+1. Windows 11에서 React/TypeScript/Vite와 Python/FastAPI 실행 환경 구축
+2. `.env.example` 및 환경 변수 로딩·필수 값 오류 처리
+3. SQLite 최소 초기화
+4. Ollama(qwen2.5-coder:7b) 실제 연결 진단
+5. YouTube Data API v3 인증·연결 진단(API 키가 없으면 검증 불가로 표시)
+6. README에 실제 실행 검증된 PowerShell 명령 작성
 
-첫 작업 완료 후 변경 파일, 실행 방법, 검증 결과, 남은 제약을 보고하세요.
+DESIGN.md와 dashboard-preview.html의 사이드바 + 영상 목록 + 우측 상세 패널 구조를 유지하세요.
+HTML 시안의 가상 데이터를 제품 코드로 복사하지 마세요. 게시 자동화를 이번 작업에 선반영하지 마세요.
+외부 서비스에 글을 게시하거나 Git push·배포하지 마세요.
+실제 사용자 실행 경로를 검증한 후 수정 파일, 실행 명령, 통과/실패/미검증, 남은 제약을 보고하세요.
 ```
 
-## 이후 구현 순서
+## 구현 작업 순서
 
-1. 지정 채널 5개의 실제 영상 조회·검색·선택
-2. 접근 가능한 근거 수집 및 Ollama 영상 맥락 분석
-3. 마케팅 댓글 초안 생성·검증·수정
-4. 채널 허용·중복·일일 상한 검사와 SQLite 작업 이력
-5. 브라우저에서 직접 게시하고 결과를 기록하는 흐름
-6. Windows E2E 검증, 실패 기록, 시연 영상 및 문서 정리
+1. **환경·연동:** Vite, FastAPI, `.env`, SQLite, Ollama, YouTube 연결
+2. **영상 탐색:** 지정 채널 목록, 검색, 필터, 직접 URL의 채널 ID 검증
+3. **AI 분석·댓글:** 근거·한계 표시, 40~120자 초안, 수정·승인
+4. **운영 규칙·DB:** 허용 대상, 중복·상한·동시 실행 제한, 활동 기록
+5. **Chrome 자동 게시:** 사용자 승인 → 프로필 실행 → 타이핑 → 게시 → 확인 → 실패 캡처
+6. **E2E·제출:** 본인 테스트 영상에서 실제 게시 검증, 2~3분 시연 영상, 제작 의도
 
-**매 작업을 마칠 때 실제 사용자 실행 경로를 검증한 후 다음 작업으로 진행합니다.** 상세 완료 조건은 `.project/plan.md`를 따릅니다.
+각 작업은 해당 기능의 실제 사용 경로가 검증된 후 완료 처리합니다.
 
 ## 과제 원문과의 차이
 
-원문은 Chrome 프로필로 시청자 위장형 댓글을 자동 입력·게시·확인하도록 요구합니다. 현재 설계는 광고 관계를 밝힌 댓글을 생성하고 사용자가 직접 게시하도록 제한합니다. 이 차이로 원문의 자동 게시 관련 항목을 충족하지 못할 수 있으며, 완료·제출 시 명시해야 합니다.
+원문의 **자동 타이핑·게시·확인 기능은 유지**합니다. 다만 홍보 관계를 숨기는 시청자 위장형 광고와 다중 계정 순환 게시를 제외하고, 사용자가 최종 승인한 홍보 고지 댓글만 자동 게시합니다. 이 차이와 평가 영향은 최종 제출물에 명시합니다.
