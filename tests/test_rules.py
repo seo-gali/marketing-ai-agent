@@ -1,9 +1,14 @@
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import HTTPException
 
 from backend.analysis import validate_comment
 from backend.services import video_id
+from backend import db, config
 
 
 class InputRules(unittest.TestCase):
@@ -26,6 +31,62 @@ class InputRules(unittest.TestCase):
                     'https://youtube.com.evil.test/watch?v=DPFhGxGM8qQ', 'invalid']:
             with self.subTest(url=url), self.assertRaises(HTTPException):
                 video_id(url)
+
+
+class PostingRules(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.path_patch = patch.object(config, 'DB_PATH', Path(self.directory.name) / 'rules.db')
+        self.path_patch.start()
+        db.initialize()
+        self.video = {'id': 'fixture0001', 'channel_id': next(iter(config.CHANNELS))}
+        self.text = '[광고] 제목의 시간여행자처럼 다양한 이야기가 궁금하다면 운명원의 연애 사주 콘텐츠도 참고해 보세요.'
+
+    def tearDown(self):
+        self.path_patch.stop()
+        self.directory.cleanup()
+
+    def test_allowlist_approval_and_profile(self):
+        for video, approved, profile in [({'id': 'outsider001', 'channel_id': 'forbidden'}, True, '유튜브1'),
+                                          (self.video, False, '유튜브1'), (self.video, True, '유튜브2')]:
+            with self.assertRaises(HTTPException):
+                db.reserve_job(video, self.text, approved, profile)
+        self.assertEqual(db.activities()['quota']['used'], 0)
+
+    def test_concurrent_duplicate_and_quota(self):
+        def reserve(_):
+            try:
+                return db.reserve_job(self.video, self.text, True)['id']
+            except HTTPException:
+                return None
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            self.assertEqual(sum(result is not None for result in pool.map(reserve, range(4))), 1)
+        for index in range(2, 11):
+            db.reserve_job({**self.video, 'id': f'fixture{index:04}'}, self.text, True)
+        self.assertEqual(db.activities()['quota']['used'], 10)
+        with self.assertRaises(HTTPException):
+            db.reserve_job({**self.video, 'id': 'fixture0012'}, self.text, True)
+
+    def test_restart_and_uncertainty(self):
+        before = db.reserve_job(self.video, self.text, True)
+        db.recover_jobs()
+        self.assertEqual(db.get_job(before['id'])['status'], 'failed')
+        after = db.reserve_job(self.video, self.text, True)
+        db.mark_submission(after['id'])
+        db.initialize()
+        db.recover_jobs()
+        self.assertEqual(db.get_job(after['id'])['status'], 'uncertain')
+        with self.assertRaises(HTTPException):
+            db.reserve_job(self.video, self.text, True)
+        self.assertEqual(len(db.activities()['jobs']), 2)
+
+    def test_midnight_quota_recheck(self):
+        with patch.object(db, 'today', return_value='2026-10-19'):
+            old = db.reserve_job(self.video, self.text, True)
+        with patch.object(config, 'DAILY_MAX', 1):
+            db.reserve_job({**self.video, 'id': 'fixture0002'}, self.text, True)
+            with self.assertRaises(HTTPException):
+                db.mark_submission(old['id'])
 
 
 if __name__ == '__main__':

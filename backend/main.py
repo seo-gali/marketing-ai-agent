@@ -11,6 +11,7 @@ from . import config, db, services, analysis
 @asynccontextmanager
 async def lifespan(app):
     db.initialize()
+    db.recover_jobs()
     yield
 
 
@@ -62,9 +63,15 @@ def get_video(video_id: str):
 
 @app.post('/api/videos/{video_id}/analyze')
 def analyze_video(video_id: str):
-    video = services.fetch_video(video_id)
-    db.save_videos([video])
-    return analysis.generate(video)
+    try:
+        video = services.fetch_video(video_id)
+        db.save_videos([video])
+        result = analysis.generate(video)
+        db.log('analysis_complete', '실제 Ollama 분석 및 초안 저장', video['id'])
+        return result
+    except HTTPException as error:
+        db.log('analysis_failed', error.detail, video_id)
+        raise
 
 
 class DraftRequest(BaseModel):
@@ -79,7 +86,21 @@ def update_draft(video_id: str, body: DraftRequest):
     if db.duplicate_draft(video_id, text):
         raise HTTPException(422, '다른 영상과 같은 댓글입니다.')
     db.save_draft(video_id, text)
+    db.log('draft_saved', '검증한 댓글 수정 저장', video_id)
     return {'comment': text}
+
+
+@app.get('/api/activities')
+def get_activities():
+    return db.activities()
+
+
+@app.get('/api/posting-jobs/{job_id}')
+def get_posting_job(job_id: str):
+    job = db.get_job(job_id)
+    if not job:
+        raise HTTPException(404, '작업을 찾을 수 없습니다.')
+    return job
 
 
 if (config.ROOT / 'dist').is_dir():
