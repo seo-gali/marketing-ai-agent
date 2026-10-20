@@ -98,6 +98,7 @@ class PostingRules(unittest.TestCase):
         second=db.activities(offset=7,limit=7)
         self.assertEqual(len(first['logs']),7)
         self.assertTrue(first['has_more'])
+        self.assertEqual(first['total_pages'],3)
         self.assertFalse({item['id'] for item in first['logs']} & {item['id'] for item in second['logs']})
 
 

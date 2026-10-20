@@ -192,7 +192,8 @@ def activities(offset=0, limit=30):
         jobs = [dict(row) for row in connection.execute('''SELECT j.*,v.title FROM posting_jobs j
                 LEFT JOIN videos v ON v.id=j.video_id ORDER BY j.created_at DESC LIMIT ? OFFSET ?''', (limit + 1, offset))]
         logs = [dict(row) for row in connection.execute('SELECT * FROM activity_logs ORDER BY id DESC LIMIT ? OFFSET ?', (limit + 1, offset))]
+        total = connection.execute('SELECT max((SELECT count(*) FROM posting_jobs),(SELECT count(*) FROM activity_logs))').fetchone()[0]
         used = connection.execute("SELECT count(*) FROM posting_jobs WHERE local_day=? AND status<>'failed'", (today(),)).fetchone()[0]
         blocked = [row[0] for row in connection.execute("SELECT video_id FROM posting_jobs WHERE status<>'failed' ORDER BY created_at DESC LIMIT 100")]
-        return {'jobs': jobs[:limit], 'logs': logs[:limit], 'has_more': len(jobs) > limit or len(logs) > limit,
+        return {'jobs': jobs[:limit], 'logs': logs[:limit], 'has_more': len(jobs) > limit or len(logs) > limit, 'total_pages': max(1, (total + limit - 1) // limit),
                 'quota': {'used': used, 'max': config.DAILY_MAX, 'day': today()}, 'blocked_video_ids': blocked}

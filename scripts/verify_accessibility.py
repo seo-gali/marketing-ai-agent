@@ -3,8 +3,9 @@ import asyncio
 import json
 import re
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, expect
 
 ROOT=Path(__file__).resolve().parents[1]
 BASE='http://127.0.0.1:8000'
@@ -71,6 +72,32 @@ async def main():
             result['contrast_samples']=contrasts
             assert await page.locator('.soft-count').evaluate("element=>getComputedStyle(element).animationName")=='none'
             result['checks'].append('sample_text_contrast_and_reduced_motion')
+            await page.set_viewport_size({'width':1440,'height':1000})
+            for selector in ['.avatar','.detail-icon','.search-submit','.top-search']:
+                delta=await page.locator(selector).evaluate('element=>{const a=element.getBoundingClientRect(),b=element.querySelector("svg").getBoundingClientRect();return {x:Math.abs(a.x+a.width/2-b.x-b.width/2),y:Math.abs(a.y+a.height/2-b.y-b.height/2)}}')
+                assert delta['y']<.5,(selector,delta)
+                if selector!='.top-search':
+                    assert delta['x']<.5,(selector,delta)
+            assert await page.locator('.app-footer>a').get_attribute('href')=='https://github.com/seo-gali/marketing-ai-agent'
+            result['checks'].append('icon_centers_and_repository_footer')
+            # 번호 이동 검사 전용 이력, 실제 DB에 기록하지 않음
+            async def history_fixture(route):
+                offset=int(parse_qs(urlparse(route.request.url).query).get('offset',['0'])[0])
+                await route.fulfill(json={'jobs':[],'logs':[{'id':offset+1,'video_id':'fixture','stage':'draft_saved','detail':f'page-{offset//30+1}','created_at':'2026-10-21T00:00:00+09:00'}],'quota':{'used':0,'max':10,'day':'2026-10-21'},'blocked_video_ids':[],'has_more':offset<60,'total_pages':3})
+            numbered=await chromium.new_page(viewport={'width':390,'height':900})
+            await numbered.route(BASE+'/api/activities*',history_fixture)
+            await numbered.goto(BASE+'/activities')
+            third=numbered.get_by_role('button',name='3페이지',exact=True)
+            await third.click()
+            await expect(third).to_have_attribute('aria-current','page')
+            await numbered.get_by_text('더보기 · 단계별 활동 기록',exact=True).click()
+            await expect(numbered.get_by_text('page-3',exact=True)).to_be_visible()
+            await numbered.get_by_role('button',name='1페이지',exact=True).click()
+            await expect(numbered.get_by_text('page-1',exact=True)).to_be_visible()
+            assert await numbered.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            await numbered.screenshot(path=str(ROOT/'artifacts'/'numbered-pagination.png'),full_page=True)
+            await numbered.close()
+            result['checks'].append('numbered_pagination_fixture_navigation')
             # 의도적으로 잘못된 응답을 넣어 오류 복구 화면만 검사
             fault=await chromium.new_page()
             await fault.route(BASE+'/api/health',lambda route:route.fulfill(json={'channels':{'bad':{'invalid':'shape'}}}))
