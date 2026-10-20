@@ -165,3 +165,38 @@ a { color:inherit;text-decoration:none; } svg { flex:none; }
 @media(max-width:950px){.shell{grid-template-columns:170px minmax(0,1fr);overflow:visible}.sidebar{grid-row:1 / span 2;}.main{border-right:0;}.detail{grid-column:2;max-height:none;min-height:0;border-top:1px solid var(--line)}.detail-scroll{overflow:visible}.detail-compose{position:relative}.sidebar{min-height:100%;}}
 @media(max-width:650px){.shell{display:block;margin:0;border:0;border-radius:0;box-shadow:none}.sidebar{min-height:0;padding:12px 15px;border:0;border-bottom:1px solid var(--line);}.sidebar .nav,.sidebar .nav-section,.sidebar-status,.sidebar-spacer,.profile{display:none}.logo{margin:0;min-height:33px}.main{padding:17px 16px 22px}.page-heading{margin:18px 0 14px}.page-heading h1{font-size:22px}.video-card{padding:11px 0}.thumb{height:54px;width:83px}.detail{min-height:0}.detail-metadata{grid-template-columns:1.3fr 1fr 1fr;gap:0}.detail-top{padding:19px 16px 15px}.detail-scroll{padding:16px}.detail-compose{padding:16px}.checks{grid-template-columns:1fr 1fr}.stat{font-size:9px}.footnote{line-height:1.6}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* 실제 API 화면의 입력·활동 영역 */
+.logo-name,.logo-sub {display:block;}
+.nav-item > span:first-child {width:18px;text-align:center;font-size:18px;color:#7d90ae;}
+.nav-item .nav-count {width:auto;font-size:10px;color:var(--blue-deep);}
+.tools .btn {width:auto;flex-shrink:0;padding:0 12px;}
+.thumb {object-fit:cover;}
+.detail {position:sticky;top:32px;align-self:start;}
+.detail-scroll h3 {font-size:12px;margin:18px 0 10px;}
+.source-link {margin:10px 0;}
+summary {cursor:pointer;font-size:11px;color:#677f9f;padding:10px 0;}
+.description {white-space:pre-wrap;overflow-wrap:anywhere;color:#6c7e9a;}
+.editor-label {display:block;font-size:11px;color:#677f9f;margin:13px 0 8px;}
+#draft {display:block;width:100%;resize:vertical;min-height:130px;border:1px solid var(--line-strong);border-radius:10px;background:#f8fbff;padding:13px;color:var(--text);font-size:12px;line-height:1.85;}
+.approval {display:flex;align-items:flex-start;gap:8px;margin-top:18px;font-size:11px;line-height:1.8;}
+.approval input {margin:4px 0 0;accent-color:var(--blue);}
+.posting-demo {display:grid;overflow-wrap:anywhere;}
+.posting-demo .callout {margin:4px 0;}
+.evidence-row,.callout,.detail-description,.activity p {overflow-wrap:anywhere;}
+.activity {margin-top:26px;}
+.activity > .evidence-row {border-width:0 0 1px;border-radius:0;padding:14px;}
+.activity > details {padding:0 13px;}
+.activity > details p {font-size:10px;color:#6c7e9a;}
+.activity .blank {margin:12px;}
+.detail-scroll .evidence-row a {font-size:10px;font-weight:750;color:#5489d7;}
+.detail-scroll .insight {margin-top:18px;}
+.detail-scroll > .btn:last-of-type {margin-top:7px;}
+.shell {height:calc(100vh - 64px);min-height:620px;}
+.sidebar {min-height:0;}
+.main {overflow:auto;}
+.detail {position:static;min-height:0;height:100%;max-height:none;}
+@media(max-width:1250px){.shell{height:calc(100vh - 30px)}}
+@media(max-width:1250px){.detail{top:15px;}}
+@media(max-width:1100px) and (min-width:651px){.shell{height:auto;grid-template-columns:170px minmax(0,1fr)}.sidebar{grid-row:1 / span 2;min-height:100%}.main{border-right:0;overflow:visible}.detail{height:auto;grid-column:2;position:static;max-height:none;min-height:0;border-top:1px solid var(--line)}.detail-scroll{overflow:visible}}
+@media(max-width:650px){.shell{height:auto}.main{overflow:visible}.detail{height:auto;position:static;max-height:none}.sidebar .nav{display:flex;flex-wrap:wrap;gap:4px;margin-top:12px}.sidebar .nav-item{width:auto;font-size:10px;min-height:30px;padding:4px 8px;gap:5px}.sidebar .nav-item > span:first-child{font-size:13px;width:13px}.sidebar .nav-count{display:none}.toolbar{flex-wrap:wrap}.filter{max-width:100%}.logo{padding:0}.detail-scroll{overflow:visible}}
