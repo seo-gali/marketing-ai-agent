@@ -1,64 +1,151 @@
-﻿# Marketing AI Agent
+# Marketing AI Agent
 
-Windows 11 로컬 React · FastAPI · SQLite · Ollama · Chrome 대시보드입니다. 광고 관계가 명시된 댓글만 검토·승인 후 게시합니다.
+YouTube 영상 조회·Ollama 분석·광고 댓글 검토·Chrome 게시용 Windows 11 로컬 대시보드
 
-## 실행
+- 검증 완료: 실제 API 조회·Ollama 추론·초안 저장·게시 규칙·화면 E2E·프로덕션 빌드
+- 미검증: 로그인된 지정 프로필의 실제 YouTube 게시·댓글 확인
+- 미구현: 자막 수집·실제 장면/발언 검증·2~3분 실게시 시연 영상
+- 운영 방식: 광고 표시·본문 승인 후 게시
 
-PowerShell, 저장소 루트에서 실행합니다. Node 24, Python 3.13, Chrome, Ollama가 필요합니다.
+## 기술 구성
+
+| 구분 | 구성 |
+|---|---|
+| 프런트엔드 | React 19 · TypeScript · Vite 8 |
+| 백엔드 | FastAPI · Python 3.13 |
+| 저장소 | SQLite · WAL |
+| 모델 | Ollama · qwen2.5-coder:7b |
+| 영상 정보 | YouTube Data API v3 |
+| 브라우저 | Playwright Python · 지정 Chrome 프로필 |
+
+## 준비 환경
+
+- Windows 11 · Node 24 · Python 3.13 · Google Chrome
+- Ollama 실행 및 `qwen2.5-coder:7b` 설치
+- YouTube Data API v3 활성화 및 API 키
+- 본인 소유 테스트 영상 ID
+
+## 설치·설정
+
+프로젝트 루트 PowerShell 기준
 
 ```powershell
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
 npm.cmd ci
-# .env가 없다면 .env.example을 .env로 복사하고 YOUTUBE_API_KEY 설정
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ollama list
+```
+
+`.env` 직접 입력 항목
+
+| 변수 | 용도·기본값 |
+|---|---|
+| `YOUTUBE_API_KEY` | 영상·댓글 조회용 API 키 |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` |
+| `OLLAMA_MODEL` | `qwen2.5-coder:7b` |
+| `DATABASE_URL` | `sqlite:///./data/marketing-agent.db` |
+| `CHROME_USER_DATA_DIR` | `./local/chrome-profiles/youtube1` |
+| `DAILY_MAX_COMMENTS` | 일일 상한 10건, 최대 10건 |
+| `COMMENT_MIN_CHARS` / `COMMENT_MAX_CHARS` | 40 / 120 |
+| `TEST_VIDEO_IDS` | 본인 소유 영상 ID, 쉼표 구분 |
+
+예시 테스트 영상: `DPFhGxGM8qQ` · Google OAuth 클라이언트 ID/Secret 불필요
+
+## 실행
+
+```powershell
+npm.cmd run build
 ./.venv/Scripts/python.exe scripts/serve.py
 ```
 
-다른 터미널에서 `npm.cmd run dev`, http://127.0.0.1:5173 을 엽니다.
-`npm.cmd run build`로 프로덕션 번들을 생성합니다.
+- 대시보드: http://127.0.0.1:8000
+- 상태: http://127.0.0.1:8000/api/health
+- API 문서: http://127.0.0.1:8000/docs
+- 개발 화면: 별도 터미널의 `npm.cmd run dev` · http://127.0.0.1:5173
+- Windows 파일 잠금 예방: `npm ci` 실행 전 Vite 종료
+- 실행 조건: 서버 1프로세스 · loopback 전용 · 외부 프록시 공개 제외
 
-## 검증 현황
+## 사용 순서
 
-- 2026-10-20: Windows에서 Vite·FastAPI·SQLite 기동, Playwright MCP로 대시보드/health 확인.
-- Ollama `qwen2.5-coder:7b` 설치·연결 확인. YouTube는 키 설정 여부만 확인, 실제 API 호출은 다음 단계에서 검증합니다.
-- `npm.cmd run build`, `npm.cmd audit`, 가상환경 `python -m pip_audit` 통과. 개발 도구 pip 취약점은 26.2.1로 갱신 후 재검사했습니다.
-- 캡처·API 키·DB·브라우저 프로필은 Git 제외. 증거 파일은 `artifacts/`와 `local/`에 보관합니다.
+1. 영상 불러오기: 지정 5채널 최신 영상 · 채널 필터 · 제목 검색 · URL 입력
+2. 영상 선택: 실제 자료 수집 · 고민/초안 생성 · 출처 확인 · 초안 편집
+3. 댓글 달기: 지정 Chrome 로그인 · 광고 본문 승인 · 글자별 입력 · 게시 · 결과 확인
 
-## 기준
+추가 동작
 
-과제 PDF(로컬 전용), `.project/plan.md`, `DESIGN.md`, `dashboard-preview.html`을 따릅니다. 현재 사용자 요청에 따라 광고 표시와 게시 승인을 적용합니다.
+- 빈 검색어: 목록 0건·입력 안내, API 422 · 전체 목록 버튼 별도
+- 댓글 오류: blur·저장 시 검증 · 오류 필드 포커스
+- 임시 저장: 영상별 localStorage · 7일 만료 · 앱 시작/영상 선택 시 만료본 삭제
+- 검색·필터: 브라우저 저장 · 초기화·실행 취소
+- 모바일: 메뉴 열기/닫기 · 단일 열 · 키보드 포커스
+- 이력: 상태·오류·캡처 · 페이지 이동
+- 사용자용 404 · 클릭 가능한 로고 · 파비콘·메타 설명
 
-### 영상 조회 검증
-- 실제 YouTube Data API로 지정 채널 5개 × 8개 = 40개 조회 성공.
-- Playwright MCP: 채널 필터 8개, 검색 빈 결과, 테스트 URL 상세 선택, 잘못된 호스트 URL 422 확인.
-- `npm.cmd run build` 통과. `artifacts/02-discovery.png` 저장.
+## 게시 규칙
 
-### AI 분석 검증
-- 실제 Ollama 추론: 테스트 음악 영상은 연애 고민 확인 불가, 71자 광고 기능 테스트 초안 생성.
-- 실제 연애 영상 `akn-AvCeHBI`는 남자의 마음 변화 고민과 별도 광고 초안 생성, 공개 인기 댓글 수집 확인.
-- 근거 인용은 모델이 재작성하지 않고 선택한 출처의 실제 원문을 서버에서 발췌합니다.
-- 자막 미확보/장면·발언 미검증을 화면에 명시합니다. F3의 실제 장면 확인은 아직 미충족입니다.
-- Playwright MCP에서 초안 표시·수정 저장 확인. `python -m unittest discover -s tests -v` 2개, 빌드 통과.
+- 지정 5채널 및 등록 테스트 영상만 허용
+- API 조회 기반 실제 채널 ID 재확인
+- 40~120자 · `[광고]`·`운명원` 필수
+- 링크·해시태그·허위 이용/시청 경험 표현 차단
+- 영상당 1건 · 동일 댓글 중복 차단 · 일일 최대 10건
+- 진행·확인 불가 작업 포함 상한 계산
+- 게시 클릭 전 제출 시도 저장 · 계정/본문/댓글 링크 대조
+- 확인 불가 상태의 성공 처리·자동 재게시 금지
+- CAPTCHA·인증·플랫폼 제한 우회 금지
+- 기본 Chrome 프로필 수정·쿠키 복사 제외
 
-### 게시 규칙·이력 검증
-- SQLite 즉시 트랜잭션과 고유 인덱스로 동시 중복 요청 차단, 일일 상한 10건(진행·불확실 포함), 승인·프로필·채널 허용 검증.
-- 제출 클릭 전에 시도를 영속 기록합니다. 재시작 시 제출 이후 중단 작업은 확인 불가로 고정하고 재게시를 차단합니다.
-- 별도 임시 SQLite DB에서 동시 요청·허용 목록·상한·날짜 변경·중단 복구를 포함한 6개 검사 통과. 실제 게시 성공을 대신하는 검증은 아닙니다.
-- 실제 서버 재시작 후 API/MCP로 기존 71자 초안 유지와 이력 API·화면을 확인했습니다. 빌드 통과.
+## 보안·검증
 
-### Chrome 게시 흐름
-- FastAPI + Playwright Python의 지정 경로 `local/chrome-profiles/youtube1` / `launch_persistent_context` 사용. 기본 Chrome·MCP 프로필로 전환하거나 인증정보를 복사하지 않습니다.
-- 전용 Chrome 실제 실행 및 한국어 YouTube 접근 확인. 수동 로그인은 사용자가 수행합니다.
-- 서버 승인 검증 → 글자별 입력 → 입력 본문 대조 → 게시 시도 영속 기록 → 계정 핸들·본문·댓글 링크 확인 → 페이지 새로고침 후 재확인 흐름 구현.
-- 타임아웃·CAPTCHA·미로그인·기존 본문·불확실 게시에서 중단하고 캡처/이력 기록. 불확실 상태 자동 재게시는 없습니다.
-- 9개 검사 통과: 임시 DB 규칙 6개 + 로컬 HTML 브라우저 픽스처 3개(입력·검증·불확실·미로그인). 픽스처 결과는 실제 YouTube 게시 성공을 뜻하지 않습니다.
-- 실제 게시: 본문 승인 완료, 앱 지정 프로필에서 로그인된 상태의 게시 검증은 미실시. 로그인된 MCP 프로필을 앱으로 이관하지 않습니다.
-- 최신 범위: MCP/앱 프로필 비교, 인증 유지의 독립 검증, 프로필 재사용 구조 변경은 제외합니다.
+```powershell
+./.venv/Scripts/python.exe -m unittest discover -s tests -v
+./.venv/Scripts/python.exe scripts/verify_e2e.py
+./.venv/Scripts/python.exe scripts/verify_accessibility.py
+npm.cmd run build
+npm.cmd audit
+./.venv/Scripts/python.exe -m pip check
+```
 
-### 대시보드 E2E
-- `dashboard-preview.html`의 HelpNest CSS를 사용한 사이드바·영상 목록·상세/댓글 패널. 데스크톱 목록과 상세 각각 스크롤, 태블릿·모바일에서 단일 열 전환 및 선택 영상 상세로 이동.
-- 실제 API/분석/초안 저장·서버 이력 폴링, 광고 본문 승인 및 수정 시 승인 초기화, 게시 상태·오류·캡처 연결 구현.
-- `./.venv/Scripts/python.exe scripts/verify_e2e.py` 통과: 실제 5채널 40영상, 필터/검색/빈 결과, 71자 초안, 편집·승인 초기화, 미승인 422·금지 채널 403·잘못된 URL 422·외부 출처 403.
-- 1440·1024·390px 가로 넘침 없음, 브라우저 JavaScript 오류 0개, 프로덕션 빌드 통과.
-- 아티팩트: `artifacts/e2e-result.json`, `artifacts/dashboard-{1440,1024,390}.png`. 자동 검증 스크립트는 실제 외부 댓글을 게시하지 않습니다.
+- Python 검사: 게시 규칙·동시성·날짜 변경·이력 페이지·격리 브라우저·보안 경계
+- 화면 E2E: 실제 5채널 40영상 · 편집/임시 저장 · 빈 검색어 · 승인 초기화 · 차단 응답 · 반응형
+- 접근성: 키보드 메뉴·본문 이동·포커스·접근성 트리·레이블·주요 텍스트 대비
+- 방어: 경로별 요청 제한·16KB 본문 상한·Host/Origin/접속 주소 검사·CSP·프레임 차단
+- 의존성 검사: 알려진 취약점 0건 · 별도 개발 도구 `pip-audit` 검사 포함
+- 검사 한계: 실제 게시·NVDA/JAWS 실기기·공개 배포 침투·대규모 부하 미검증
+- 자동 검증의 외부 댓글 게시: 미실행
+
+## 로컬 데이터·백업
+
+| 경로 | 내용 |
+|---|---|
+| `data/marketing-agent.db` | 영상·분석·초안·작업·단계별 이력 |
+| `local/chrome-profiles/` | 지정 프로필의 인증 상태 |
+| `local/screenshots/` | 오류·입력·확인 캡처 |
+| `local/backups/` | SQLite 일관 백업 |
+| `artifacts/` | E2E·접근성 결과 및 화면 |
+
+```powershell
+./.venv/Scripts/python.exe scripts/backup_db.py
+```
+
+백업 검사: SQLite Backup API · 무결성 확인 · 원본 DB 변경 없음
+
+Git 제외: `.env`·API 키·Chrome 인증정보·DB·캡처·로컬 백업·과제 PDF
+
+## 결과 문서
+
+- [한눈에 보는 HTML](docs/index.html)
+- [구현·실행 결과 및 제작 의도](docs/results/verification.md)
+- [보안 감사](docs/results/security-audit.md)
+- [접근성·사용성 검수](docs/results/accessibility.md)
+
+## 남은 항목
+
+- 실제 YouTube 입력·게시·댓글 확인 E2E 및 2~3분 시연 영상
+- 자막 수집·구체적 장면/발언 확인
+- 가점: 프로필 2·3 선택/배정 · 뜨기 직전 영상 탐색
+- 모델의 의미적 사실성에 대한 사용자 검토
+- 인터넷 공개 전 별도 인증·권한 설계
+
+기준: 과제 PDF · `.project/plan.md` · `DESIGN.md` · `AGENTS.md`
+화면 참조: 사용자 제공 `marketing-ai-agent-implemented`의 프런트엔드
