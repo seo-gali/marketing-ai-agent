@@ -1,72 +1,55 @@
-# Environment variables and secrets
+# Environment and credentials
 .env
 .env.*
 !.env.example
-!.env.*.example
 *.pem
 *.key
 credentials.json
-client_secret*.json
-*token*.json
+secrets.json
 
-# Node.js / Vite
+# Node / Vite
 node_modules/
 dist/
 build/
-coverage/
 .vite/
+coverage/
+.npm/
 *.tsbuildinfo
-*.log
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # Python
-__pycache__/
-*.py[cod]
 .venv/
 venv/
+__pycache__/
+*.py[cod]
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-.pyright/
-.coverage
-htmlcov/
 *.egg-info/
 
-# Local databases and transient state
+# Local database and browser profiles
+data/
 *.db
-*.db-journal
-*.sqlite
-*.sqlite3
-*.sqlite3-shm
-*.sqlite3-wal
-*.sqlite3-journal
 *.db-shm
 *.db-wal
-
-# Browser profiles and authentication
-playwright/.auth/
-.auth/
-user-data/
+*.sqlite
+*.sqlite3
+local/
 chrome-profiles/
-browser-profiles/
+user-data-dir/
 
-# Test and runtime artifacts
-test-results/
+# Logs and browser test artifacts
+logs/
+*.log
+screenshots/
 playwright-report/
-blob-report/
+test-results/
 artifacts/
-tmp/
-temp/
 
-# Local source assignment (not for public redistribution)
-docs/reference/track-2-marketing-agent.pdf
-
-# IDE / OS
+# IDE and OS
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-Desktop.ini
+
+# Private assessment reference (keep on local machine)
+docs/reference/track-2-marketing-agent.pdf
