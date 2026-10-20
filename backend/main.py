@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, db, services
+from . import config, db, services, analysis
 
 
 @asynccontextmanager
@@ -57,7 +57,29 @@ def get_video(video_id: str):
     video = db.get_video(services.video_id(video_id))
     if not video:
         raise HTTPException(404, '영상이 없습니다.')
-    return {**video, 'allowed': services.allowed(video)}
+    return {**video, 'allowed': services.allowed(video), 'analysis': db.get_analysis(video_id)}
+
+
+@app.post('/api/videos/{video_id}/analyze')
+def analyze_video(video_id: str):
+    video = services.fetch_video(video_id)
+    db.save_videos([video])
+    return analysis.generate(video)
+
+
+class DraftRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@app.put('/api/drafts/{video_id}')
+def update_draft(video_id: str, body: DraftRequest):
+    if not db.get_video(services.video_id(video_id)):
+        raise HTTPException(404, '영상이 없습니다.')
+    text = analysis.validate_comment(body.text)
+    if db.duplicate_draft(video_id, text):
+        raise HTTPException(422, '다른 영상과 같은 댓글입니다.')
+    db.save_draft(video_id, text)
+    return {'comment': text}
 
 
 if (config.ROOT / 'dist').is_dir():

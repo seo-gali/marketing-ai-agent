@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import './style.css'
-import { api, type Video, type Health } from './api'
+import { api, type Video, type Health, type Analysis } from './api'
 
 function App() {
   const [health, setHealth] = useState<Health>()
@@ -13,6 +13,30 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
+  const [analysis, setAnalysis] = useState<Analysis>()
+  const [draft, setDraft] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+  const selectedId = useRef('')
+  async function select(video: Video) {
+    selectedId.current = video.id; setSelected(video); setAnalysis(undefined); setDraft(''); setError(''); setAnalyzing(true)
+    try {
+      const detail = await api<Video & {analysis: Analysis | null}>(`/videos/${video.id}`)
+      const data = detail.analysis ?? await api<Analysis>(`/videos/${video.id}/analyze`, 'POST')
+      if(selectedId.current === video.id) {setAnalysis(data); setDraft(data.comment)}
+    } catch(e) { if(selectedId.current === video.id) setError((e as Error).message) }
+    finally { if(selectedId.current === video.id) setAnalyzing(false) }
+  }
+  async function regenerate() {
+    if(!selected) return
+    const id = selected.id; setAnalyzing(true); setError('')
+    try { const data = await api<Analysis>(`/videos/${id}/analyze`, 'POST'); if(selectedId.current === id) {setAnalysis(data); setDraft(data.comment)} }
+    catch(e) {setError((e as Error).message)} finally { if(selectedId.current === id) setAnalyzing(false) }
+  }
+  async function save() {
+    if(!selected) return
+    try { const data = await api<{comment:string}>(`/drafts/${selected.id}`, 'PUT', {text:draft}); setDraft(data.comment); setError('') }
+    catch(e) {setError((e as Error).message)}
+  }
   useEffect(() => { api<Health>('/health').then(setHealth).catch(e => setError(e.message)) }, [])
   async function load() {
     setBusy(true); setError(''); setWarnings([])
@@ -21,7 +45,7 @@ function App() {
   }
   async function resolve() {
     setBusy(true); setError('')
-    try { const video = await api<Video>('/videos/resolve', 'POST', {url}); setVideos(v => [video, ...v.filter(x => x.id !== video.id)]); setSelected(video) }
+    try { const video = await api<Video>('/videos/resolve', 'POST', {url}); setVideos(v => [video, ...v.filter(x => x.id !== video.id)]); void select(video) }
     catch(e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   const visible = videos.filter(v => (!channel || v.channel_id === channel) && `${v.title} ${v.channel}`.toLowerCase().includes(search.toLowerCase()))
@@ -32,8 +56,13 @@ function App() {
       <div className="toolbar"><button className="btn primary" disabled={busy} onClick={load}>{busy ? '불러오는 중…' : '① 영상 불러오기'}</button><span>{videos.length}개 영상 · 5개 채널</span></div>
       <form className="tools" onSubmit={e => {e.preventDefault(); void resolve()}}><input aria-label="YouTube 영상 링크" className="input" value={url} onChange={e => setUrl(e.target.value)} placeholder="YouTube 영상 URL"/><button className="btn" disabled={busy || !url}>링크 확인</button></form>
       {error && <p role="alert" className="callout">{error}</p>}{warnings.map(w => <p className="callout" key={w}>{w}</p>)}
-      <div role="status" className="count">{busy ? 'YouTube API 조회 중' : `${visible.length}개 표시`}</div><div className="video-list">{visible.map(video => <button key={video.id} className="video-card" aria-pressed={selected?.id === video.id} onClick={() => setSelected(video)}><img className="thumb" src={video.thumbnail} alt=""/><span className="video-meta"><h3>{video.title}</h3><p>{video.channel} · {new Date(video.published_at).toLocaleDateString('ko-KR')}</p><span className="badge">{video.allowed ? '게시 허용 범위' : '분석만 가능'}</span></span></button>)}{!busy && !visible.length && <div className="blank">{videos.length ? '검색 결과가 없습니다.' : '아직 불러온 영상이 없습니다.'}</div>}</div>
-    </main><aside className="detail" id="analysis"><div className="detail-top"><span className="badge">AI Content Review</span><h2>② 영상 선택 · 분석</h2><p>{selected?.title ?? '왼쪽에서 영상을 선택하세요.'}</p></div>{selected && <div className="detail-scroll"><p>{selected.channel} · {new Date(selected.published_at).toLocaleDateString('ko-KR')}</p><a className="btn" href={`https://www.youtube.com/watch?v=${selected.id}`} target="_blank" rel="noreferrer">영상 보기 ↗</a><p className="description">{selected.description}</p></div>}</aside>
+      <div role="status" className="count">{busy ? 'YouTube API 조회 중' : `${visible.length}개 표시`}</div><div className="video-list">{visible.map(video => <button key={video.id} className="video-card" aria-pressed={selected?.id === video.id} disabled={analyzing} onClick={() => void select(video)}><img className="thumb" src={video.thumbnail} alt=""/><span className="video-meta"><h3>{video.title}</h3><p>{video.channel} · {new Date(video.published_at).toLocaleDateString('ko-KR')}</p><span className="badge">{video.allowed ? '게시 허용 범위' : '분석만 가능'}</span></span></button>)}{!busy && !visible.length && <div className="blank">{videos.length ? '검색 결과가 없습니다.' : '아직 불러온 영상이 없습니다.'}</div>}</div>
+    </main><aside className="detail" id="analysis"><div className="detail-top"><span className="badge">AI Content Review</span><h2>② 영상 선택 · 분석</h2><p>{selected?.title ?? '왼쪽에서 영상을 선택하세요.'}</p></div>{selected && <div className="detail-scroll"><p>{selected.channel} · {new Date(selected.published_at).toLocaleDateString('ko-KR')}</p><a className="btn" href={`https://www.youtube.com/watch?v=${selected.id}`} target="_blank" rel="noreferrer">영상 보기 ↗</a><details><summary>영상 설명</summary><p className="description">{selected.description}</p></details>
+      {analyzing && <p role="status">Ollama 분석 중… 실제 자료를 읽고 있습니다.</p>}
+      {analysis && <><div className="insight"><p className="lead">AI INSIGHT</p><p className="statement">{analysis.concern}</p></div><h3>분석 근거 · 출처</h3>{analysis.evidence.map((e,i) => <div className="evidence-row" key={i}><a href={e.url} target="_blank" rel="noreferrer">{e.label} ↗</a><p>{e.quote}</p></div>)}{analysis.warnings.map(w => <p className="callout" key={w}>{w}</p>)}<p className="fineprint">{analysis.model} · {new Date(analysis.created_at).toLocaleString('ko-KR')}</p></>}
+      <button className="btn" disabled={analyzing} onClick={regenerate}>{analysis ? '초안 다시 생성' : '영상 분석'}</button>
+      <div className="divider"/><section id="composer"><h3>③ 광고 댓글 검토</h3><label htmlFor="draft">댓글 초안 · 40~120자</label><textarea id="draft" value={draft} onChange={e => setDraft(e.target.value)} disabled={analyzing} rows={5}/><p>{[...draft].length}자 · [광고]와 운명원 필수</p><button className="btn" disabled={analyzing || !draft} onClick={save}>수정 저장</button></section>
+    </div>}</aside>
   </div>
 }
 

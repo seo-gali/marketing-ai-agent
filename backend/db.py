@@ -31,6 +31,14 @@ def initialize():
                 channel TEXT NOT NULL, published_at TEXT NOT NULL, thumbnail TEXT NOT NULL,
                 description TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS analyses (
+                video_id TEXT PRIMARY KEY REFERENCES videos(id), data TEXT NOT NULL,
+                model TEXT NOT NULL, created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS comment_drafts (
+                video_id TEXT PRIMARY KEY REFERENCES videos(id), text TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
         ''')
 
 
@@ -47,3 +55,30 @@ def get_video(video_id):
     with connect() as connection:
         row = connection.execute('SELECT * FROM videos WHERE id=?', (video_id,)).fetchone()
         return dict(row) if row else None
+
+
+def get_analysis(video_id):
+    with connect() as connection:
+        row = connection.execute('SELECT * FROM analyses WHERE video_id=?', (video_id,)).fetchone()
+        draft = connection.execute('SELECT text FROM comment_drafts WHERE video_id=?', (video_id,)).fetchone()
+        return {**json.loads(row['data']), 'model': row['model'], 'created_at': row['created_at'],
+                'comment': draft['text'] if draft else ''} if row else None
+
+
+def save_analysis(video_id, data):
+    with connect() as connection:
+        connection.execute('INSERT OR REPLACE INTO analyses VALUES (?,?,?,?)',
+                           (video_id, json.dumps(data, ensure_ascii=False), config.MODEL, now()))
+        connection.execute('INSERT OR REPLACE INTO comment_drafts VALUES (?,?,?)',
+                           (video_id, data['comment'], now()))
+
+
+def save_draft(video_id, text):
+    with connect() as connection:
+        connection.execute('INSERT OR REPLACE INTO comment_drafts VALUES (?,?,?)', (video_id, text, now()))
+
+
+def duplicate_draft(video_id, text):
+    with connect() as connection:
+        return connection.execute('SELECT 1 FROM comment_drafts WHERE video_id<>? AND text=?',
+                                  (video_id, text)).fetchone() is not None

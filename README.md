@@ -33,3 +33,10 @@ ollama list
 - 실제 YouTube Data API로 지정 채널 5개 × 8개 = 40개 조회 성공.
 - Playwright MCP: 채널 필터 8개, 검색 빈 결과, 테스트 URL 상세 선택, 잘못된 호스트 URL 422 확인.
 - `npm.cmd run build` 통과. `artifacts/02-discovery.png` 저장.
+
+### AI 분석 검증
+- 실제 Ollama 추론: 테스트 음악 영상은 연애 고민 확인 불가, 71자 광고 기능 테스트 초안 생성.
+- 실제 연애 영상 `akn-AvCeHBI`는 남자의 마음 변화 고민과 별도 광고 초안 생성, 공개 인기 댓글 수집 확인.
+- 근거 인용은 모델이 재작성하지 않고 선택한 출처의 실제 원문을 서버에서 발췌합니다.
+- 자막 미확보/장면·발언 미검증을 화면에 명시합니다. F3의 실제 장면 확인은 아직 미충족입니다.
+- Playwright MCP에서 초안 표시·수정 저장 확인. `python -m unittest discover -s tests -v` 2개, 빌드 통과.
