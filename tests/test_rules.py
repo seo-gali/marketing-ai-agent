@@ -21,6 +21,9 @@ class InputRules(unittest.TestCase):
                         valid + ' 직접 상담받았어요.', valid + '\n한줄추가']:
             with self.subTest(text=invalid), self.assertRaises(HTTPException):
                 validate_comment(invalid)
+        for suffix in [' bit.ly/test', ' ｂｉｔ．ｌｙ/test', ' b\u200bit.ly/test']:
+            with self.assertRaises(HTTPException):
+                validate_comment(valid + suffix)
 
     def test_video_url_boundary(self):
         for url in ['DPFhGxGM8qQ', 'https://youtu.be/DPFhGxGM8qQ',
@@ -87,6 +90,15 @@ class PostingRules(unittest.TestCase):
             db.reserve_job({**self.video, 'id': 'fixture0002'}, self.text.replace('다양한', '두번째'), True)
             with self.assertRaises(HTTPException):
                 db.mark_submission(old['id'])
+
+    def test_history_is_bounded_and_paginated(self):
+        for index in range(20):
+            db.log('fixture',str(index))
+        first=db.activities(limit=7)
+        second=db.activities(offset=7,limit=7)
+        self.assertEqual(len(first['logs']),7)
+        self.assertTrue(first['has_more'])
+        self.assertFalse({item['id'] for item in first['logs']} & {item['id'] for item in second['logs']})
 
 
 if __name__ == '__main__':

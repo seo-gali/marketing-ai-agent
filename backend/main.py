@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
 import asyncio
 import re
+import unicodedata
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse
 from pydantic import StrictBool
 from fastapi.staticfiles import StaticFiles
 
 from . import config, db, services, analysis, browser
+from .security import LocalSecurity
 
 
 @asynccontextmanager
@@ -22,20 +24,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title='Marketing AI Agent', lifespan=lifespan)
-
-
-@app.middleware('http')
-async def local_only(request: Request, call_next):
-    host = request.headers.get('host', '').split(':')[0]
-    origin = request.headers.get('origin')
-    if request.headers.get('sec-fetch-site') == 'cross-site':
-        return JSONResponse({'detail': '허용되지 않은 요청 출처입니다.'}, status_code=403)
-    if host not in {'127.0.0.1', 'localhost', 'testserver'}:
-        return JSONResponse({'detail': '로컬 접근만 허용됩니다.'}, status_code=403)
-    if origin and origin not in {'http://127.0.0.1:5173', 'http://localhost:5173',
-                                 'http://127.0.0.1:8000', 'http://localhost:8000'}:
-        return JSONResponse({'detail': '허용되지 않은 요청 출처입니다.'}, status_code=403)
-    return await call_next(request)
+app.add_middleware(LocalSecurity)
 
 
 @app.get('/api/health')
@@ -48,9 +37,13 @@ class ResolveRequest(BaseModel):
 
 
 @app.get('/api/videos')
-def get_videos():
+def get_videos(q: str | None = Query(default=None, max_length=100)):
+    if q is not None and (not unicodedata.normalize('NFKC', q).strip() or any(unicodedata.category(character) in {'Cc', 'Cf'} for character in q)):
+        raise HTTPException(422, '검색어를 입력하세요. 전체 조회는 영상 불러오기를 사용하세요.')
     videos, warnings = services.discover()
     db.save_videos(videos)
+    if q is not None:
+        videos = [video for video in videos if q.strip().casefold() in (video['title'] + ' ' + video['channel']).casefold()]
     return {'videos': [{**video, 'allowed': services.allowed(video)} for video in videos], 'warnings': warnings}
 
 
@@ -66,7 +59,7 @@ def get_video(video_id: str):
     video = db.get_video(services.video_id(video_id))
     if not video:
         raise HTTPException(404, '영상이 없습니다.')
-    return {**video, 'allowed': services.allowed(video), 'analysis': db.get_analysis(video_id)}
+    return {**video, 'allowed': services.allowed(video), 'analysis': db.get_analysis(video_id), 'posting_job': db.video_job(video_id)}
 
 
 @app.post('/api/videos/{video_id}/analyze')
@@ -99,8 +92,8 @@ def update_draft(video_id: str, body: DraftRequest):
 
 
 @app.get('/api/activities')
-def get_activities():
-    return db.activities()
+def get_activities(offset: int = Query(default=0, ge=0, le=100000), limit: int = Query(default=30, ge=1, le=100)):
+    return db.activities(offset, limit)
 
 
 @app.get('/api/posting-jobs/{job_id}')
@@ -167,4 +160,14 @@ def get_screenshot(filename: str):
 
 
 if (config.ROOT / 'dist').is_dir():
-    app.mount('/', StaticFiles(directory=config.ROOT / 'dist', html=True), name='dashboard')
+    app.mount('/assets', StaticFiles(directory=config.ROOT / 'dist' / 'assets'), name='assets')
+
+    @app.get('/favicon.svg', include_in_schema=False)
+    def favicon():
+        return FileResponse(config.ROOT / 'dist' / 'favicon.svg')
+
+    @app.get('/{path:path}', include_in_schema=False)
+    def dashboard(path: str):
+        if path.startswith('api/'):
+            raise HTTPException(404, 'API 경로를 찾을 수 없습니다.')
+        return FileResponse(config.ROOT / 'dist' / 'index.html', status_code=200 if path in {'', 'activities', 'settings'} else 404)

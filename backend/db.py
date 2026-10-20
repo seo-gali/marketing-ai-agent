@@ -56,6 +56,10 @@ def initialize():
                 id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, video_id TEXT,
                 stage TEXT NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL
             );
+            CREATE INDEX IF NOT EXISTS jobs_day_status ON posting_jobs(local_day,status);
+            CREATE INDEX IF NOT EXISTS jobs_created ON posting_jobs(created_at DESC);
+            CREATE INDEX IF NOT EXISTS drafts_text ON comment_drafts(text);
+            CREATE INDEX IF NOT EXISTS jobs_text ON posting_jobs(text) WHERE status<>'failed';
         ''')
 
 
@@ -177,11 +181,18 @@ def recover_jobs():
                    error='서버 재시작으로 작업 중단. 제출 시도 후 작업은 자동 재게시하지 않습니다.')
 
 
-def activities():
+def video_job(video_id):
+    with connect() as connection:
+        row = connection.execute("SELECT * FROM posting_jobs WHERE video_id=? ORDER BY created_at DESC LIMIT 1", (video_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def activities(offset=0, limit=30):
     with connect() as connection:
         jobs = [dict(row) for row in connection.execute('''SELECT j.*,v.title FROM posting_jobs j
-                LEFT JOIN videos v ON v.id=j.video_id ORDER BY j.created_at DESC LIMIT 100''')]
-        logs = [dict(row) for row in connection.execute('SELECT * FROM activity_logs ORDER BY id DESC LIMIT 150')]
+                LEFT JOIN videos v ON v.id=j.video_id ORDER BY j.created_at DESC LIMIT ? OFFSET ?''', (limit + 1, offset))]
+        logs = [dict(row) for row in connection.execute('SELECT * FROM activity_logs ORDER BY id DESC LIMIT ? OFFSET ?', (limit + 1, offset))]
         used = connection.execute("SELECT count(*) FROM posting_jobs WHERE local_day=? AND status<>'failed'", (today(),)).fetchone()[0]
-        blocked = [row[0] for row in connection.execute("SELECT video_id FROM posting_jobs WHERE status<>'failed'")]
-        return {'jobs': jobs, 'logs': logs, 'quota': {'used': used, 'max': config.DAILY_MAX, 'day': today()}, 'blocked_video_ids': blocked}
+        blocked = [row[0] for row in connection.execute("SELECT video_id FROM posting_jobs WHERE status<>'failed' ORDER BY created_at DESC LIMIT 100")]
+        return {'jobs': jobs[:limit], 'logs': logs[:limit], 'has_more': len(jobs) > limit or len(logs) > limit,
+                'quota': {'used': used, 'max': config.DAILY_MAX, 'day': today()}, 'blocked_video_ids': blocked}

@@ -73,7 +73,7 @@ def normalize_video(item):
     thumbnails = snippet.get('thumbnails', {})
     return {'id': item['id'], 'channel_id': snippet['channelId'], 'title': snippet['title'],
             'channel': snippet['channelTitle'], 'published_at': snippet['publishedAt'],
-            'thumbnail': thumbnails.get('medium', thumbnails.get('default', {})).get('url', ''),
+            'thumbnail': thumbnails.get('default', thumbnails.get('medium', {})).get('url', ''),
             'description': snippet.get('description', '')}
 
 

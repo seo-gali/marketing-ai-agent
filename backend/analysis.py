@@ -17,7 +17,8 @@ def validate_comment(text: str) -> str:
         raise HTTPException(422, f'댓글은 {config.MIN_CHARS}~{config.MAX_CHARS}자여야 합니다. (현재 {len(text)}자)')
     if not text.startswith('[광고]') or '운명원' not in text:
         raise HTTPException(422, '댓글은 [광고]로 시작하고 운명원을 언급해야 합니다.')
-    if re.search(r'https?[:：]|www[.．]|[a-z0-9-]+\.(?:com|kr|net|org|io)\b|[#＃]|[\x00-\x1f\x7f]', text, re.I):
+    screened = unicodedata.normalize('NFKC', text)
+    if any(unicodedata.category(character) in {'Cc', 'Cf'} for character in text) or re.search(r'https?:|www\.|(?:[\w-]+\.)+[^\W\d_]{2,63}\b|(?:\d{1,3}\.){3}\d{1,3}|#', screened, re.I):
         raise HTTPException(422, '링크·해시태그·제어 문자는 사용할 수 없습니다.')
     if re.search(r'다녀|써봤|봤는데|받아봤|이용했|이용해\s*봤|방문했|상담받|상담을?\s*받|적중|용하|백발백중|100%|무조건|보장|잘\s*맞[는더았]|시청했|보고\s*왔|영상\s*보니|영상\s*봤', text):
         raise HTTPException(422, '허위 이용·시청 경험 또는 검증되지 않은 효능 표현을 제거하세요.')
