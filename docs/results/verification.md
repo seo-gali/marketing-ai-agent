@@ -69,11 +69,35 @@ Playwright MCP로 초기 Windows 대시보드와 실제 한국어 YouTube 댓글
 - `artifacts/live-analysis.json`: 실제 Ollama 분석 2건의 모델·시각·초안
 - `artifacts/accessibility-result.json`, `artifacts/accessibility-tree.json`: 키보드·구조·대비·HTML 검사
 - `artifacts/docs-overview.png`: 초보자용 HTML 안내 문서
+- `artifacts/docs-e2e-result.json`: 프로젝트 소개·탭·Markdown 팝업의 로컬 검증
+- `artifacts/docs-pages-result.json`: `DOCS_URL` 지정 시 공개 Pages 검증 결과
 - `artifacts/dashboard-1440.png`, `dashboard-1024.png`, `dashboard-390.png`: 실제 화면
 - `artifacts/youtube-test-ui.png`: 실제 한국어 댓글 UI
 - `local/screenshots/`: 브라우저 오류 캡처
 
 인증정보·DB·캡처·과제 PDF·로컬 아티팩트는 Git에 포함하지 않았습니다.
+
+## 프로젝트 소개 페이지
+
+공개 주소: https://seo-gali.github.io/marketing-ai-agent/
+
+기본 탭은 프로젝트 소개, 별도 탭은 앱 점검 현황입니다. README·구현 결과·보안 감사·접근성 문서는
+공개 저장소 원문을 가져와 팝업 안에서 제목·표·목록·코드·인용·링크로 표시합니다.
+새 패키지 없이 저장소 문서에 사용된 Markdown 문법을 처리하며, 원문의 HTML은 실행하지 않습니다.
+
+`python scripts/verify_docs.py`의 로컬 검증은 통과했습니다. 실제 문서 4개의 조회·서식,
+키보드 탭 이동·팝업 포커스 순환·Escape·닫은 뒤 포커스 복귀, 390/1440px 넘침을 확인했습니다.
+조회 오류와 위험한 HTML·링크의 차단은 브라우저 응답 픽스처로 검사했습니다.
+
+공개 배포본 검증 명령:
+
+```powershell
+$env:DOCS_URL='https://seo-gali.github.io/marketing-ai-agent/'
+./.venv/Scripts/python.exe scripts/verify_docs.py
+Remove-Item Env:DOCS_URL
+```
+
+Pages는 정적 소개 페이지입니다. FastAPI·Ollama·Chrome 게시 앱의 실행 환경은 Windows 로컬입니다.
 
 ## 실제 게시의 남은 확인
 

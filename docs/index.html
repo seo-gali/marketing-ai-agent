@@ -1,26 +1,140 @@
 <!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta name="description" content="Marketing AI의 동작, 보안 점검, 접근성 검수를 처음 보는 사람을 위한 짧은 안내."/>
-  <title>앱과 점검 결과 한눈에 보기 · Marketing AI</title>
-  <link rel="icon" type="image/svg+xml" href="../public/favicon.svg"/>
-  <style>
-    :root{font-family:'Malgun Gothic',system-ui,sans-serif;color:#203453;background:#f3f7fe;font-synthesis:none}*{box-sizing:border-box}body{margin:0;padding:40px 22px;line-height:1.7}main{max-width:980px;margin:auto}a{color:#205ab4;text-underline-offset:4px}a:focus-visible,summary:focus-visible{outline:3px solid #245fc6;outline-offset:4px}.skip{position:absolute;top:-80px}.skip:focus{top:8px;background:white;padding:8px}header{margin-bottom:32px}.eyebrow{font-size:12px;font-weight:700;color:#245dba;letter-spacing:.13em}h1{font-size:clamp(30px,5vw,48px);line-height:1.3;letter-spacing:-.04em;margin:14px 0}h2{font-size:22px;line-height:1.4;margin:0 0 20px}h3{font-size:15px;margin:0 0 5px}p{margin:8px 0;color:#52657c}section{background:white;border:1px solid #dfe8f4;border-radius:18px;padding:28px;margin:18px 0}.flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;list-style:none;padding:0;margin:20px 0 0}.flow li{padding:19px;border:1px solid #dfe8f4;border-radius:12px;background:#f7faff}.step{display:block;color:#245dba;font-size:12px;font-weight:700;margin-bottom:6px}.flow strong{display:block;font-size:19px}.flow p{font-size:13px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.card{border-radius:12px;background:#f3f7fe;padding:20px}.number{display:block;color:#245dba;font-size:34px;font-weight:800}.tag{display:inline-block;font-size:12px;font-weight:700;color:#086347;background:#e6f6ed;padding:3px 9px;border-radius:6px}.caution{border-left:4px solid #9c671d;background:#fff8ec;padding:12px 16px;margin-top:18px;color:#77501d}.chain{padding:15px;border:1px solid #dfe8f4;border-radius:12px;margin:10px 0;font-size:14px;color:#324d70}.chain strong{color:#087054}.checks{padding-left:22px;color:#405a77}.checks li{margin:9px 0}details{margin-top:18px}summary{cursor:pointer;color:#205ab4;font-weight:700}.links{display:flex;flex-wrap:wrap;gap:12px 22px;font-size:13px}footer{padding:20px 0;font-size:12px;color:#566982}.scope{font-size:12px;color:#566982}.plain{font-size:15px}@media(max-width:620px){body{padding:24px 14px}section{padding:21px}.flow,.cards{grid-template-columns:minmax(0,1fr)}.flow li{padding:15px}.card{display:flex;align-items:center;gap:18px}.number{min-width:40px}h2{font-size:20px}.links{flex-direction:column;gap:10px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
-  </style>
-</head>
-<body>
-  <a class="skip" href="#main">본문으로 이동</a>
-  <main id="main" tabindex="-1">
-    <header><span class="eyebrow">MARKETING AI · LOCAL APP</span><h1>앱 동작과<br/>점검 결과</h1><p class="plain">YouTube 영상을 읽고 광고 댓글 초안을 만드는 내 PC용 도구입니다.</p></header>
-    <section aria-labelledby="flow-title"><h2 id="flow-title">어떻게 작동하나요?</h2><ol class="flow"><li><span class="step">01 · 가져오기</span><strong>영상 선택</strong><p>지정된 5개 채널의 공개 영상</p></li><li><span class="step">02 · 검토하기</span><strong>근거와 초안 확인</strong><p>제목·설명·댓글 → 로컬 AI</p></li><li><span class="step">03 · 승인하기</span><strong>Chrome에서 게시</strong><p>글자별 입력 → 게시 → 확인</p></li></ol><p class="caution">실제 YouTube 게시 검증은 아직 끝나지 않았습니다. 자막·장면을 확인한 것으로 표시하지 않습니다.</p></section>
-    <section aria-labelledby="summary"><h2 id="summary">1. 점검 요약</h2><div class="cards"><div class="card"><span class="number">6</span><div><h3>확인한 문제</h3><p>중간 4 · 낮음 2</p></div></div><div class="card"><span class="number">6</span><div><h3>보완한 문제</h3><p>요청 제한·화면 보호·입력 검사 등</p></div></div><div class="card"><span class="number">2</span><div><h3>남은 조건부 위험</h3><p>인터넷 공개 · AI 의미 오류</p></div></div></div><p class="scope">현재는 내 PC에서 한 사람이 사용하는 환경입니다. 인터넷 공개용 로그인 시스템을 갖춘 서비스가 아닙니다.</p></section>
-    <section aria-labelledby="findings"><h2 id="findings">2. 무엇을 고쳤나요?</h2><ul class="checks"><li><strong>너무 많은 요청</strong> — 횟수와 입력 크기를 제한합니다.</li><li><strong>다른 사이트의 화면 조작</strong> — 앱을 프레임에 넣지 못하게 합니다.</li><li><strong>숨겨진 링크</strong> — 단축 주소·보이지 않는 문자를 검사합니다.</li><li><strong>누적 데이터와 화면 오류</strong> — 이력을 나누고 복구 안내를 제공합니다.</li></ul><span class="tag">빈 검색어는 전체 조회하지 않음</span></section>
-    <section aria-labelledby="chains"><h2 id="chains">3. 공격은 어떻게 이어지나요?</h2><div class="chain">반복 조회 → API 쿼터 고갈 → <strong>요청 제한으로 중단</strong></div><div class="chain">다른 페이지에 화면 숨기기 → 실수 클릭 → <strong>프레임 차단으로 중단</strong></div><div class="chain">악성 댓글의 지시 → AI의 잘못된 초안 → <strong>원문과 사람이 다시 확인</strong></div><p>사람의 검토와 공개 배포 시 별도 인증은 여전히 필요합니다.</p></section>
-    <section aria-labelledby="recommendations"><h2 id="recommendations">4. 사용 전 확인할 것</h2><ul class="checks"><li>광고 표시와 실제 근거를 확인하세요.</li><li>본인 테스트 영상에서 실제 게시를 확인하세요.</li><li>앱을 인터넷에 그대로 공개하지 마세요.</li><li>API 키·Chrome 로그인 정보는 Git에 넣지 마세요.</li></ul><details><summary>키보드와 스크린리더는요?</summary><p><strong>“웹접근성을 준수하는지 전체 검수해주세요.”</strong></p><p>본문 바로가기, 키보드 메뉴, 포커스 표시, 입력 레이블, 오류 읽기 구조를 검사합니다. 실제 NVDA·JAWS 심사는 별도로 남아 있습니다.</p></details></section>
-    <nav class="links" aria-label="상세 결과 파일"><a href="results/security-audit.md">상세 보안 감사</a><a href="results/accessibility.md">접근성 검수</a><a href="results/verification.md">구현·실행 결과</a><a href="../README.md">실행 방법</a></nav>
-    <footer>© 2026 Marketing AI · 검증일 2026-10-21 · 확인하지 않은 동작은 완료로 표시하지 않습니다.</footer>
-  </main>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="YouTube 영상 조회, Ollama 초안 생성, 승인 후 Chrome 게시를 연결한 Windows 로컬 앱. 프로젝트 소개와 검증 현황." />
+    <title>프로젝트 소개 · Marketing AI Agent</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">본문으로 이동</a>
+    <main id="main" tabindex="-1">
+      <header>
+        <span class="eyebrow">프로젝트 소개 · WINDOWS LOCAL APP</span>
+        <h1>Marketing AI Agent</h1>
+        <p>YouTube 영상 조회, AI 댓글 초안 작성, Chrome 게시를 연결한 로컬 대시보드.</p>
+        <div class="actions">
+          <button class="button primary" data-doc="README.md" data-title="설치·실행 방법">설치·실행 방법</button>
+          <a class="button" href="https://github.com/seo-gali/marketing-ai-agent">GitHub 저장소</a>
+        </div>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="프로젝트 안내">
+        <button id="intro-tab" class="tab" role="tab" aria-selected="true" aria-controls="intro-panel">프로젝트 소개</button>
+        <button id="status-tab" class="tab" role="tab" aria-selected="false" aria-controls="status-panel" tabindex="-1">앱 점검 현황</button>
+      </div>
+
+      <section id="intro-panel" class="panel" role="tabpanel" aria-labelledby="intro-tab">
+        <section class="card" aria-labelledby="flow-title">
+          <h2 id="flow-title">세 단계로 진행하는 작업</h2>
+          <ol class="flow">
+            <li>
+              <span class="step">01 · 조회</span>
+              <strong>영상 선택</strong>
+              <p>지정 5개 채널의 최신 영상과 공개 자료 확인</p>
+            </li>
+            <li>
+              <span class="step">02 · 검토</span>
+              <strong>근거와 초안 확인</strong>
+              <p>Ollama 분석, 출처 확인, 광고 댓글 편집</p>
+            </li>
+            <li>
+              <span class="step">03 · 승인</span>
+              <strong>Chrome에서 게시</strong>
+              <p>본문 승인 후 글자별 입력 → 게시 → 확인</p>
+            </li>
+          </ol>
+          <p class="note">실제 YouTube 게시 검증은 남아 있습니다. 광고 관계를 밝히고 승인한 본문만 게시하는 방식입니다.</p>
+        </section>
+
+        <section class="card" aria-labelledby="stack-title">
+          <h2 id="stack-title">기술 구성</h2>
+          <dl class="stack">
+            <div><dt>화면</dt><dd>React · TypeScript</dd></div>
+            <div><dt>API</dt><dd>FastAPI</dd></div>
+            <div><dt>저장</dt><dd>SQLite</dd></div>
+            <div><dt>AI</dt><dd>Ollama</dd></div>
+          </dl>
+          <p class="small">실행 환경: Windows 11 · Chrome · qwen2.5-coder:7b</p>
+          <p class="small">이 페이지는 프로젝트 안내용입니다. 앱 실행은 README의 로컬 설치 절차를 따릅니다.</p>
+        </section>
+
+        <section class="card" aria-labelledby="rules-title">
+          <h2 id="rules-title">게시 전 확인하는 조건</h2>
+          <ul class="checks">
+            <li>광고 표시 · 본문 승인 · 40~120자</li>
+            <li>허용 채널 · 영상당 1건 · 하루 최대 10건</li>
+            <li>출처 표시 · 허위 이용 경험과 링크 차단</li>
+            <li>게시 확인 불가 시 자동 재게시 금지</li>
+          </ul>
+        </section>
+      </section>
+
+      <section id="status-panel" class="panel" role="tabpanel" aria-labelledby="status-tab" hidden>
+        <div class="status-grid">
+          <section class="card" aria-labelledby="checked-title">
+            <span class="badge">검증 완료</span>
+            <h2 id="checked-title">확인한 동작</h2>
+            <ul class="checks">
+              <li>실제 YouTube API · 5채널 40영상</li>
+              <li>Ollama 추론 · 출처와 초안 저장</li>
+              <li>게시 제한 · 동시 중복 차단 · 이력</li>
+              <li>Python 검사 14건 · 화면 E2E · 빌드</li>
+              <li>키보드 조작 · 모바일 · 주요 텍스트 대비</li>
+            </ul>
+          </section>
+          <section class="card" aria-labelledby="pending-title">
+            <span class="badge pending">미구현·미검증</span>
+            <h2 id="pending-title">남은 확인</h2>
+            <ul class="checks">
+              <li>실제 계정의 YouTube 입력·게시·댓글 확인</li>
+              <li>자막 수집 · 영상 장면·발언 확인</li>
+              <li>2~3분 실제 게시 시연 영상</li>
+              <li>NVDA·JAWS 실기기 검수</li>
+            </ul>
+          </section>
+        </div>
+
+        <section class="card" aria-labelledby="security-title">
+          <h2 id="security-title">보안 점검</h2>
+          <div class="numbers">
+            <div><span class="number">6</span><strong>확인한 문제</strong><p>중간 4 · 낮음 2</p></div>
+            <div><span class="number">6</span><strong>보완·재검증</strong><p>요청 제한 · 입력 검사 등</p></div>
+            <div><span class="number">2</span><strong>조건부 위험</strong><p>인터넷 공개 · AI 의미 오류</p></div>
+          </div>
+          <details>
+            <summary>접근성 검수 범위</summary>
+            <p class="small">“웹접근성을 준수하는지 전체 검수해주세요.”</p>
+            <p class="small">키보드·포커스·레이블·구조·주요 대비 검사 완료. 보조공학 실기기 검수는 미완료.</p>
+          </details>
+        </section>
+
+        <section class="card" aria-labelledby="reports-title">
+          <h2 id="reports-title">상세 보고서</h2>
+          <p class="small">문서 선택 시 팝업에서 원문을 마크다운 서식으로 표시합니다.</p>
+          <div class="actions">
+            <button class="button" data-doc="docs/results/verification.md" data-title="구현·실행 결과">구현·실행 결과</button>
+            <button class="button" data-doc="docs/results/security-audit.md" data-title="보안 감사">보안 감사</button>
+            <button class="button" data-doc="docs/results/accessibility.md" data-title="접근성 검수">접근성 검수</button>
+          </div>
+        </section>
+      </section>
+
+      <footer>© 2026 <a href="https://github.com/seo-gali/marketing-ai-agent">seo-gali/marketing-ai-agent</a> · 검증일 2026-10-21</footer>
+    </main>
+
+    <dialog id="document-dialog" aria-labelledby="document-title">
+      <header class="dialog-header">
+        <h2 id="document-title">문서</h2>
+        <button id="document-close" class="close" aria-label="문서 닫기" autofocus>×</button>
+      </header>
+      <div id="document-content" class="document-body markdown" aria-live="polite" aria-busy="false"></div>
+      <footer class="dialog-footer">
+        <a id="document-source" href="https://github.com/seo-gali/marketing-ai-agent" target="_blank" rel="noopener noreferrer">GitHub에서 원문 보기 ↗</a>
+      </footer>
+    </dialog>
+  </body>
 </html>

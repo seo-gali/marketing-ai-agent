@@ -110,7 +110,17 @@ async def main():
             assert await page.locator('main').count()==1
             assert await page.locator('h1').count()==1
             for link in await page.locator('a[href]:not([href^="#"])').all():
-                assert (ROOT/'docs'/await link.get_attribute('href')).resolve().is_file()
+                href=await link.get_attribute('href')
+                if href=='https://github.com/seo-gali/marketing-ai-agent':
+                    continue
+                elif href.startswith('https://github.com/seo-gali/marketing-ai-agent/blob/main/'):
+                    assert (ROOT/href.split('/blob/main/',1)[1]).resolve().is_file()
+                else:
+                    assert (ROOT/'docs'/href).resolve().is_file()
+            for button in await page.locator('[data-doc]').all():
+                assert (ROOT/await button.get_attribute('data-doc')).resolve().is_file()
+            favicon=await page.locator('link[rel=icon]').get_attribute('href')
+            assert (ROOT/'docs'/favicon).resolve().is_file()
             for width in [390,1440]:
                 await page.set_viewport_size({'width':width,'height':900})
                 assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
