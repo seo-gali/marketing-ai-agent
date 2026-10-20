@@ -5,11 +5,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / 'artifacts'
-BASE = os.environ.get('APP_URL', 'http://127.0.0.1:5173')
+BASE = os.environ.get('APP_URL', 'http://127.0.0.1:8000')
 
 
 async def main():
@@ -22,25 +22,39 @@ async def main():
         page.on('pageerror', lambda error: console_errors.append(str(error)))
         try:
             await page.goto(BASE)
+            await page.evaluate("localStorage.setItem('marketing-ai:draft:expired-test',JSON.stringify({text:'expired',expiresAt:0}))")
+            await page.reload()
+            assert await page.evaluate("localStorage.getItem('marketing-ai:draft:expired-test')") is None
             await page.get_by_role('button', name='외롭여', exact=True).wait_for()
             await page.get_by_role('button', name='① 영상 불러오기').click()
-            await page.locator('.video-card').first.wait_for(timeout=45000)
-            videos = await page.locator('.video-card').count()
+            await page.locator('.video-item').first.wait_for(timeout=45000)
+            videos = await page.locator('.video-item').count()
             assert videos > 0
-            channels = {text.split(' · ')[0] for text in await page.locator('.video-meta p').all_text_contents()}
+            channels = {text.split(' · ')[0] for text in await page.locator('.video-info > span').all_text_contents()}
             assert len(channels) == 5, channels
             result['checks'].append({'live_youtube_list': videos, 'channels': len(channels)})
             await page.get_by_role('button', name='외롭여', exact=True).click()
-            filtered = await page.locator('.video-card').count()
+            filtered = await page.locator('.video-item').count()
             assert 0 < filtered < videos
             await page.get_by_role('searchbox', name='영상 검색').fill('no-result-e2e-xyz')
-            await page.get_by_text('검색 결과가 없습니다.').wait_for()
+            await page.get_by_text('조건에 맞는 영상이 없습니다.').wait_for()
             await page.get_by_role('searchbox', name='영상 검색').fill('')
-            await page.get_by_role('button', name='전체', exact=True).click()
-            result['checks'].append({'filter_and_empty_search': 'passed'})
+            assert await page.locator('.video-item').count()==0
+            await page.get_by_text('검색어를 입력하세요. 빈 검색어로 전체 목록을 조회하지 않습니다.').wait_for()
+            for query in ['']:
+                rejected=await page.request.get(BASE+'/api/videos',params={'q':query})
+                assert rejected.status==422
+            await page.get_by_role('button', name='전체 목록 보기', exact=True).click()
+            assert await page.locator('.video-item').count()==videos
+            await page.get_by_role('button',name='실행 취소',exact=True).click()
+            assert await page.locator('.video-item').count()==0
+            await page.get_by_role('button',name='전체 목록 보기',exact=True).click()
+            result['checks'].append({'filter_and_empty_search': 'passed', 'empty_query_api':422})
+            await page.get_by_text('더보기 · 영상 URL로 선택',exact=True).click()
             await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/DPFhGxGM8qQ')
             await page.get_by_role('button', name='링크 확인').click()
-            await page.wait_for_function("document.querySelector('#draft')?.value.length > 0", timeout=240000)
+            await expect(page.locator('#draft')).not_to_have_value('',timeout=240000)
+            assert await page.get_by_role('button',name='실행 취소',exact=True).count()==0
             draft = await page.locator('#draft').input_value()
             assert 40 <= len(draft) <= 120 and draft.startswith('[광고]') and '운명원' in draft
             await page.get_by_text('연애 고민 확인 불가', exact=True).wait_for()
@@ -59,6 +73,19 @@ async def main():
             await page.get_by_role('button', name='수정 저장').click()
             await page.wait_for_timeout(300)
             result['checks'].append({'draft_edit_and_approval_reset': 'passed', 'draft_length': len(draft)})
+            edited=draft.replace('시간여행자를','제목의 시간여행자를')
+            await page.locator('#draft').fill(edited)
+            await expect(page.get_by_text('이 브라우저에 임시 저장됨 · 7일 보관',exact=True)).to_be_visible()
+            assert await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:DPFhGxGM8qQ')).text")==edited
+            await page.reload()
+            await page.get_by_text('더보기 · 영상 URL로 선택',exact=True).click()
+            await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/DPFhGxGM8qQ')
+            await page.get_by_role('button',name='링크 확인',exact=True).click()
+            await expect(page.locator('#draft')).to_have_value(edited)
+            assert not await page.get_by_role('checkbox').is_checked()
+            await page.locator('#draft').fill(draft)
+            await page.get_by_role('button',name='수정 저장').click()
+            result['checks'].append({'local_draft_recovery_without_approval':'passed'})
             rejected = await page.request.post(BASE + '/api/posting-jobs', data={
                 'video_id': 'DPFhGxGM8qQ', 'text': draft, 'approved': False})
             assert rejected.status == 422
@@ -80,10 +107,24 @@ async def main():
                 assert scroll <= client, f'가로 넘침: {width}, {scroll}>{client}'
             assert not console_errors, console_errors
             result['checks'].append({'responsive_1440_1024_390': 'passed', 'javascript_errors': 0})
+            for route in ['/activities','/settings','/page-that-does-not-exist']:
+                response=await page.goto(BASE+route)
+                assert response.status==(404 if route.endswith('exist') else 200)
+                await page.get_by_role('heading',level=1).wait_for()
+                scroll,client=await page.evaluate('[document.documentElement.scrollWidth,document.documentElement.clientWidth]')
+                assert scroll<=client
+                assert await page.locator('input[placeholder],textarea[placeholder]').count()==0
+            await page.get_by_role('link',name='영상 탐색으로 이동',exact=True).click()
+            await page.get_by_role('heading',name='영상 탐색',exact=False).wait_for()
+            for route in ['/','/activities','/settings','/api/health','/favicon.svg']:
+                assert (await page.request.get(BASE+route)).status==200
+            assert await page.locator('meta[name=description]').get_attribute('content')
+            assert str(datetime.now().year) in await page.locator('.app-footer').inner_text()
+            result['checks'].append({'all_mobile_pages_404_metadata_favicon_footer_links':'passed'})
             result['status'] = 'passed'
         except Exception as error:
             result['status'] = 'failed'
-            result['error'] = str(error)[:1000]
+            result['error'] = (str(error) or type(error).__name__)[:1000]
             await page.screenshot(path=ARTIFACTS / 'e2e-failure.png', full_page=True)
             raise
         finally:

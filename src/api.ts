@@ -2,7 +2,7 @@ export interface Video { id: string; channel_id: string; title: string; channel:
 export interface Health { status: string; ollama: string; model: string; youtube: string; daily_max: number; min_chars: number; max_chars: number; channels: Record<string,string>; test_video_ids: string[] }
 export interface Analysis { concern: string; comment: string; evidence: {source_id: string; quote: string; label: string; url: string}[]; warnings: string[]; scene_verified: boolean; model: string; created_at: string }
 export interface Job { id: string; video_id: string; title?: string; profile: string; text: string; status: string; error: string | null; screenshot: string | null; comment_url: string | null; created_at: string }
-export interface Activities { jobs: Job[]; logs: {id:number; video_id: string; stage: string; detail: string; created_at: string}[]; quota: {used:number; max:number; day:string}; blocked_video_ids: string[] }
+export interface Activities { jobs: Job[]; logs: {id:number; video_id: string; stage: string; detail: string; created_at: string}[]; quota: {used:number; max:number; day:string}; blocked_video_ids: string[]; has_more: boolean }
 export const labels: Record<string,string> = {queued:'게시 대기',opening:'프로필 여는 중',navigating:'영상 여는 중',typing:'입력 중',submitting:'게시 중',verifying:'댓글 확인 중',success:'게시 완료',failed:'실패',uncertain:'확인 불가',analysis_complete:'분석 완료',analysis_failed:'분석 실패',draft_saved:'초안 저장',rejected:'게시 차단'}
 export interface BrowserStatus { open: boolean; signed_in: boolean; needs_action: string; busy: boolean; profile: string }
 
