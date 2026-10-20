@@ -1,18 +1,24 @@
 from contextlib import asynccontextmanager
+import asyncio
+import re
 
 from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel, Field
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from pydantic import StrictBool
 from fastapi.staticfiles import StaticFiles
 
-from . import config, db, services, analysis
+from . import config, db, services, analysis, browser
 
 
 @asynccontextmanager
 async def lifespan(app):
     db.initialize()
     db.recover_jobs()
-    yield
+    try:
+        yield
+    finally:
+        await browser.shutdown()
 
 
 app = FastAPI(title='Marketing AI Agent', lifespan=lifespan)
@@ -22,6 +28,8 @@ app = FastAPI(title='Marketing AI Agent', lifespan=lifespan)
 async def local_only(request: Request, call_next):
     host = request.headers.get('host', '').split(':')[0]
     origin = request.headers.get('origin')
+    if request.headers.get('sec-fetch-site') == 'cross-site':
+        return JSONResponse({'detail': '허용되지 않은 요청 출처입니다.'}, status_code=403)
     if host not in {'127.0.0.1', 'localhost', 'testserver'}:
         return JSONResponse({'detail': '로컬 접근만 허용됩니다.'}, status_code=403)
     if origin and origin not in {'http://127.0.0.1:5173', 'http://localhost:5173',
@@ -101,6 +109,61 @@ def get_posting_job(job_id: str):
     if not job:
         raise HTTPException(404, '작업을 찾을 수 없습니다.')
     return job
+
+
+class BrowserRequest(BaseModel):
+    video_id: str | None = None
+
+
+@app.post('/api/browser/open')
+async def open_browser(body: BrowserRequest):
+    video_id = services.video_id(body.video_id) if body.video_id else None
+    return await browser.open_profile(video_id)
+
+
+@app.post('/api/browser/close')
+async def close_browser():
+    return await browser.close_profile()
+
+
+@app.get('/api/browser/status')
+async def browser_status():
+    return await browser.status()
+
+
+class PostingRequest(BaseModel):
+    video_id: str
+    text: str = Field(min_length=1, max_length=2000)
+    approved: StrictBool
+    profile: str = '유튜브1'
+
+
+@app.post('/api/posting-jobs', status_code=202)
+async def post_comment(body: PostingRequest):
+    try:
+        analysis.validate_comment(body.text)
+        if body.approved is not True:
+            raise HTTPException(422, '댓글 본문을 검토하고 광고 게시를 승인하세요.')
+        video = await asyncio.to_thread(services.fetch_video, body.video_id)
+        if browser.lock.locked():
+            raise HTTPException(409, '다른 Chrome 작업이 진행 중입니다.')
+        db.save_videos([video])
+        job = db.reserve_job(video, body.text, body.approved, body.profile)
+        browser.start_job(job)
+        return job
+    except HTTPException as error:
+        db.log('rejected', error.detail, body.video_id)
+        raise
+
+
+@app.get('/api/screenshots/{filename}')
+def get_screenshot(filename: str):
+    if not re.fullmatch(r'[a-f0-9]{32}(?:-typed)?\.png', filename):
+        raise HTTPException(404, '캡처가 없습니다.')
+    path = browser.SCREENSHOTS / filename
+    if not path.is_file():
+        raise HTTPException(404, '캡처가 없습니다.')
+    return FileResponse(path, headers={'Cache-Control': 'no-store'})
 
 
 if (config.ROOT / 'dist').is_dir():

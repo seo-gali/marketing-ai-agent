@@ -122,6 +122,8 @@ def reserve_job(video, text, approved, profile='유튜브1'):
         raise HTTPException(422, '다른 영상과 같은 댓글을 게시할 수 없습니다.')
     with connect() as connection:
         connection.execute('BEGIN IMMEDIATE')
+        if connection.execute("SELECT 1 FROM posting_jobs WHERE video_id<>? AND text=? AND status<>'failed'", (video['id'], text)).fetchone():
+            raise HTTPException(422, '다른 영상에 게시했거나 진행 중인 동일한 댓글입니다.')
         if connection.execute("SELECT 1 FROM posting_jobs WHERE video_id=? AND status<>'failed'", (video['id'],)).fetchone():
             raise HTTPException(409, '이미 게시되었거나 진행 중 또는 확인 불가인 영상입니다. 재게시하지 않습니다.')
         count = connection.execute("SELECT count(*) FROM posting_jobs WHERE local_day=? AND status<>'failed'", (today(),)).fetchone()[0]

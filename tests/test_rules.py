@@ -62,10 +62,10 @@ class PostingRules(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=4) as pool:
             self.assertEqual(sum(result is not None for result in pool.map(reserve, range(4))), 1)
         for index in range(2, 11):
-            db.reserve_job({**self.video, 'id': f'fixture{index:04}'}, self.text, True)
+            db.reserve_job({**self.video, 'id': f'fixture{index:04}'}, self.text.replace('다양한', f'{index}번째'), True)
         self.assertEqual(db.activities()['quota']['used'], 10)
         with self.assertRaises(HTTPException):
-            db.reserve_job({**self.video, 'id': 'fixture0012'}, self.text, True)
+            db.reserve_job({**self.video, 'id': 'fixture0012'}, self.text.replace('다양한', '열두번째'), True)
 
     def test_restart_and_uncertainty(self):
         before = db.reserve_job(self.video, self.text, True)
@@ -84,7 +84,7 @@ class PostingRules(unittest.TestCase):
         with patch.object(db, 'today', return_value='2026-10-19'):
             old = db.reserve_job(self.video, self.text, True)
         with patch.object(config, 'DAILY_MAX', 1):
-            db.reserve_job({**self.video, 'id': 'fixture0002'}, self.text, True)
+            db.reserve_job({**self.video, 'id': 'fixture0002'}, self.text.replace('다양한', '두번째'), True)
             with self.assertRaises(HTTPException):
                 db.mark_submission(old['id'])
 
