@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="color-scheme" content="light"/>
+<title>Marketing AI Agent · Dashboard</title>
+<style>
+:root {
+  --canvas: #f2f6fc; --paper: #fff; --paper-tint: #f8fbff; --line: #e8eef8;
+  --line-strong: #dce6f4; --text: #182b48; --sub: #8291a8; --blue: #3779ef;
+  --blue-deep:#2864d6; --blue-soft:#edf4ff; --green:#119a80; --green-bg:#e4f8f2;
+  --amber:#bc8631; --amber-bg:#fff7e7; --shadow:0 14px 55px rgba(68,96,142,.07);
+  --radius:16px;
+}
+* { box-sizing:border-box; }
+html { font-family: Inter, Pretendard, 'Noto Sans KR', 'Malgun Gothic',system-ui,sans-serif;scroll-behavior:smooth; }
+body { margin:0;min-height:100vh;background:radial-gradient(ellipse at 48% 0%,#f9fcff 0,#eef4fc 78%);color:var(--text);font-size:13px;line-height:1.55; }
+button,textarea,input { font:inherit; } button { cursor:pointer; }
+button:focus-visible,textarea:focus-visible,input:focus-visible,a:focus-visible { outline:3px solid #b0caff;outline-offset:2px; }
+button:disabled { opacity:.48;cursor:not-allowed; }
+a { color:inherit;text-decoration:none; } svg { flex:none; }
+.mono { font-variant-numeric:tabular-nums; }
+.shell { max-width:1750px;min-height:calc(100vh - 64px);margin:32px auto;background:var(--paper);border:1px solid #e9eff8;border-radius:19px;box-shadow:0 24px 80px rgba(59,91,149,.075);display:grid;grid-template-columns:208px minmax(390px,1fr) minmax(425px,490px);overflow:hidden; }
+/* SIDEBAR */
+.sidebar { border-right:1px solid var(--line);background:linear-gradient(160deg,#fbfdff 5%,#f9fbff 100%);min-height:835px;display:flex;flex-direction:column;padding:20px 13px 17px; }
+.logo { display:flex;align-items:center;gap:10px;padding:0 10px;margin:2px 0 39px;min-height:36px; }
+.logo-mark { display:grid;place-items:center;width:31px;height:31px;background:linear-gradient(135deg,#84b1ff,#3c74ea);border-radius:9px;box-shadow:0 5px 13px #3c74ea30;color:white; }
+.logo-mark svg { width:19px;height:19px; } .logo-name { font-size:16px;font-weight:850;letter-spacing:-.055em; }
+.logo-sub { font-size:9px;letter-spacing:.09em;color:var(--sub);font-weight:700;margin-top:1px; }
+.nav-section { color:#9aabc1;font-size:10px;font-weight:800;letter-spacing:.075em;padding:0 15px;margin:24px 0 10px; }
+.nav-section:first-of-type { margin-top:0; }
+.nav { display:grid;gap:4px; }
+.nav-item { width:100%;display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:9px;color:#61728d;font-size:12px;font-weight:650;min-height:40px;transition:background .15s,color .15s; }
+.nav-item svg { height:17px;width:17px;color:#7d90ae;stroke-width:1.8; }
+.nav-item:hover { background:#f0f5fd;color:#3067c3; }
+.nav-item.active { color:var(--blue-deep);background:#eaf2ff;box-shadow:inset 3px 0 var(--blue);font-weight:780; }
+.nav-item.active svg { color:var(--blue); }
+.nav-count { margin-left:auto;padding:2px 7px;border-radius:7px;background:#d3e3ff;color:var(--blue-deep);font-size:10px;font-weight:800; }
+.sidebar-spacer { flex:1;min-height:24px; }
+.sidebar-status { margin:0 5px 17px;background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 11px; }
+.sidebar-status-label { display:flex;align-items:center;gap:6px;color:#5c728e;font-size:11px;font-weight:750; }
+.green-dot,.dot { width:7px;height:7px;border-radius:50%;background:#c6cedb;display:inline-block;flex:none; }
+.green-dot { background:#21bc97;box-shadow:0 0 0 3px #e5fbf3; }
+.sidebar-status p { margin:5px 0 0;font-size:10px;color:#96a4b7; }
+.profile { display:flex;align-items:center;gap:10px;padding:11px 8px 0;border-top:1px solid var(--line); }
+.avatar { display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:11px;font-weight:850;color:#2459a0;background:linear-gradient(140deg,#cde9ff,#c3d2ff);border:2px solid white;box-shadow:0 2px 8px #a4bed331; }
+.profile-name { font-size:11px;font-weight:800; } .profile-role { font-size:10px;color:var(--sub); }
+.profile svg { margin-left:auto;color:#8b99ae; }
+/* WORK AREA */
+.main { min-width:0;border-right:1px solid var(--line);padding:20px 24px 24px; }
+.search-wrap { position:relative;display:flex;align-items:center;gap:10px;background:#f6f9fe;border:1px solid #f0f4fa;border-radius:11px;padding:0 14px;height:39px; }
+.search-wrap svg { color:#93a5be;width:17px;height:17px; }
+.search-wrap input { width:100%;height:100%;outline:0;border:0;background:transparent;font-size:11px;color:var(--text); }
+.search-wrap input::placeholder { color:#a6b3c6; } .search-wrap:focus-within { border-color:#b2c9fb;box-shadow:0 0 0 3px #eaf2ff; }
+.page-heading { margin:25px 0 18px; } .page-heading h1 { font-size:23px;font-weight:850;letter-spacing:-.055em;line-height:1.3;margin:0 0 4px; }
+.page-heading p { font-size:11px;color:var(--sub);margin:0; }
+.topline { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.stats { display:flex;gap:7px; } .stat { color:#9aabc0;font-size:10px;font-weight:700;white-space:nowrap; }
+.stat strong { color:var(--blue);font-size:12px;margin-left:4px; } .stat .muted-value {color:#7589a8;}
+.filter {display:flex;gap:6px;overflow:auto;scrollbar-width:none;padding-bottom:2px;margin:17px 0 14px;}
+.filter::-webkit-scrollbar {display:none;}
+.chip { border:1px solid #e7edf8;background:#fff;border-radius:9px;padding:7px 10px;color:#7989a4;font-size:10px;font-weight:730;white-space:nowrap; }
+.chip:hover {background:#f8fbff;} .chip[aria-pressed="true"] { background:#e6f0ff;color:#3575da;border-color:#cbdfff;box-shadow:0 2px 5px #8eb7f316; }
+.toolbar { display:flex;align-items:center;gap:8px;margin:12px 0 15px; }
+.btn { display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #dfe8f6;border-radius:9px;color:#536a8c;background:#fff;min-height:35px;padding:0 12px;font-size:11px;font-weight:780;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s; }
+.btn:hover:not(:disabled) { background:#f4f8ff;border-color:#c2d7f5; }
+.btn.primary {background:var(--blue);border-color:var(--blue);color:white;box-shadow:0 3px 9px #3678e824;}
+.btn.primary:hover:not(:disabled) { background:var(--blue-deep);border-color:var(--blue-deep); }
+.btn.soft { background:var(--blue-soft);color:#3978e1;border-color:#e1ebfc; }
+.btn.small { min-height:29px;padding:0 9px;font-size:10px; }
+.btn.full {width:100%;} .btn svg {height:14px;width:14px;}
+.actions { display:flex;gap:8px;flex-wrap:wrap; } .actions .btn { flex:1; }
+.tools {display:flex;gap:7px;min-width:0;margin:10px 0 13px;}
+.tools .input {flex:1;min-width:0;height:36px;border:1px solid #e4ebf6;border-radius:9px;padding:0 11px;outline:none;font-size:11px;}
+.tools .input:focus {border-color:#9dbbfa;box-shadow:0 0 0 3px #edf3ff;}
+.tools .input::placeholder {color:#a6b3c4;}
+.tools .btn {width:39px;padding:0;}
+.list-label {display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;}
+.kicker {font-size:11px;font-weight:800;color:#263a57;}
+.count {font-size:10px;color:#91a0b7;}
+.video-list {border-top:1px solid var(--line);min-width:0;}
+.video-card {display:flex;align-items:center;width:100%;gap:13px;min-width:0;text-align:left;background:#fff;border:0;border-bottom:1px solid var(--line);padding:13px 5px;position:relative;}
+.video-card:hover { background:#fbfdff; } .video-card[aria-pressed="true"] {background:#f3f8ff;}
+.video-card[aria-pressed="true"]:before {content:"";position:absolute;left:-9px;top:15px;bottom:15px;width:3px;border-radius:6px;background:var(--blue);}
+.thumb {height:57px;width:86px;flex:none;border-radius:10px;overflow:hidden;position:relative;background:linear-gradient(135deg,#c7d6fa,#6e9ce3);}
+.thumb.a{background:linear-gradient(135deg,#e6c5e3,#998dde)}.thumb.b{background:linear-gradient(135deg,#bfecdd,#70c5c1)}.thumb.c{background:linear-gradient(135deg,#f8d3d3,#dc96b5)}.thumb.d{background:linear-gradient(135deg,#bbd4fa,#779fd6)}.thumb.e{background:linear-gradient(135deg,#ded1f4,#a291ce)}
+.thumb:before {content:"";position:absolute;right:-19px;top:-37px;width:89px;height:89px;border-radius:50%;background:#fff4;}
+.thumb:after {content:"";position:absolute;left:-10px;bottom:-23px;width:55px;height:55px;background:#fff2;border-radius:16px;transform:rotate(35deg);}
+.thumb-words { position:absolute;left:9px;bottom:7px;font-size:10px;line-height:1.25;color:white;font-weight:850;text-shadow:0 1px 4px #0003;z-index:2; }
+.video-meta {flex:1;min-width:0;} .video-meta h3 { font-weight:800;font-size:11px;line-height:1.6;color:#273955;letter-spacing:-.025em;margin:0 0 3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.video-meta p {font-size:10px;color:#9baac0;margin:0;} .video-meta .tiny {display:flex;align-items:center;gap:7px;margin-top:6px;}
+.round-check {display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#d6e6ff;color:#3b7ce3;font-weight:800;margin-left:auto;}
+.badge {display:inline-flex;align-items:center;justify-content:center;gap:5px;background:#e9f1ff;color:#4680d8;border-radius:7px;padding:4px 9px;font-size:10px;font-weight:750;white-space:nowrap;}
+.badge.neutral {background:#f2f5fa;color:#8595ac;} .badge.warn {background:#fff3e6;color:#b88445;} .badge.success {background:#e4f8f1;color:#189b83;} .badge.inline {padding:2px 7px;font-size:9px;}
+.blank {margin:16px 0;padding:35px 18px;text-align:center;background:#f8fbff;border:1px dashed #dce7f6;border-radius:11px;color:#9aabc0;font-size:11px;line-height:1.9;}
+.blank strong {display:block;color:#7387a5;font-size:12px;}
+.fineprint {font-size:10px;color:#a0acc1;line-height:1.65;}
+/* DETAILS */
+.detail { min-width:0;background:white;display:flex;flex-direction:column;max-height:calc(100vh - 64px);min-height:835px;box-shadow:-9px 0 28px rgba(85,115,153,.025); }
+.detail-top {padding:23px 20px 19px;border-bottom:1px solid var(--line);}
+.detail-toprow {display:flex;align-items:center;gap:10px;margin-bottom:17px;}
+.detail-symbol {display:grid;place-items:center;width:27px;height:27px;border-radius:9px;background:linear-gradient(140deg,#a6caff,#5e90ee);color:white;}
+.detail-symbol svg {width:15px;height:15px;}
+.detail-label {font-weight:800;font-size:11px;letter-spacing:.025em;}
+.detail-id {font-size:11px;color:#91a3be;margin-left:2px;}
+.detail-toprow .badge {margin-left:3px;}
+.detail-right {margin-left:auto;display:flex;gap:10px;align-items:center;}
+.detail-right svg {width:17px;height:17px;color:#7990b4;}
+.online {background:#f4f8fc;border-radius:50px;padding:6px 10px;font-size:10px;color:#70839e;font-weight:760;display:inline-flex;align-items:center;gap:7px;}
+.online .green-dot {width:6px;height:6px;}
+.detail-title {font-size:20px;font-weight:850;letter-spacing:-.055em;margin:0 0 6px;line-height:1.35;}
+.detail-description {color:#8c9cb3;font-size:11px;margin:0;line-height:1.6;}
+.detail-metadata {display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:0;padding:15px 20px;border-bottom:1px solid var(--line);}
+.meta-item {min-width:0;padding-left:12px;border-left:1px solid #ebeff6;}
+.meta-item:first-child {padding-left:0;border-left:0;}
+.meta-label {font-size:9px;color:#98a8bd;margin:0 0 7px;display:flex;align-items:center;gap:5px;}
+.meta-label svg {width:12px;height:12px;} .meta-value {font-size:10px;font-weight:760;color:#465b77;line-height:1.5;}
+.detail-scroll { padding:19px 20px 24px;overflow:auto;min-height:0;flex:1;scrollbar-color:#dfe8f6 transparent;scrollbar-width:thin;}
+.panel {min-width:0;} .panel-head {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px;}
+.panel-no {color:#76a0e4;font-size:9px;font-weight:800;letter-spacing:.095em;margin-bottom:3px;}
+.panel-title {font-size:13px;font-weight:850;letter-spacing:-.035em;margin:0;color:#253853;}
+.panel-desc {font-size:10px;color:#a0aec2;margin:3px 0 0;}
+.panel-body {display:flex;flex-direction:column;gap:14px;}
+.selected-header {display:flex;align-items:center;gap:10px;background:#f8fbff;border:1px solid #edf2fa;border-radius:10px;padding:10px;}
+.selected-icon {width:32px;height:32px;background:#dceaff;border-radius:9px;display:grid;place-items:center;color:var(--blue);flex:none;}
+.selected-icon svg {width:17px;height:17px;} .selected-header .name {font-size:10px;font-weight:800;line-height:1.5;overflow-wrap:anywhere;}
+.selected-header p {font-size:9px;color:#9baabd;margin:4px 0 0;}
+.section-top {display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:10px;}
+.section-top h3 {margin:0;font-size:11px;font-weight:830;color:#2d415d;}
+.insight {background:#edf5ff;border-radius:11px;padding:13px 15px;border:1px solid #e7f0ff;}
+.insight .lead {color:#5489d7;font-weight:850;font-size:9px;letter-spacing:.08em;margin:0 0 7px;}
+.insight .statement {font-size:12px;font-weight:760;line-height:1.7;margin:0;letter-spacing:-.03em;}
+.insight .note {margin-top:6px;color:#8295b2;font-size:10px;line-height:1.5;}
+.evidence {display:grid;gap:8px;} .evidence-row {padding:10px 12px;border:1px solid #ebeff7;background:#f9fbfe;border-radius:9px;}
+.evidence-row .source {font-size:9px;font-weight:850;color:#7c9bcc;letter-spacing:.03em;}
+.evidence-row p {font-size:10px;color:#6c7e9a;margin:5px 0 0;line-height:1.65;}
+.callout {display:flex;gap:8px;border:1px solid #f8e9d2;background:#fffaf1;color:#b18a4d;border-radius:9px;padding:10px 11px;font-size:10px;line-height:1.6;}
+.callout svg {width:14px;height:14px;margin-top:1px;}
+.divider {height:1px;background:var(--line);margin:20px 0;}
+.muted-block {border:1px solid #eef2f9;background:#f9fbff;border-radius:9px;padding:11px 12px;}
+.draft-head {display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;} .draft-label {font-size:11px;font-weight:850;}
+.editor {width:100%;min-height:120px;max-height:320px;resize:vertical;background:#f9fbff;border:1px solid #e4ebf6;border-radius:10px;padding:12px 13px;outline:0;color:#324763;font-size:11px;line-height:1.7;}
+.editor:focus {border-color:#a7c1f6;box-shadow:0 0 0 3px #eff5ff;background:white;} .editor::placeholder {color:#a7b4c4;}
+.draft-bottom {display:flex;justify-content:space-between;margin:7px 0 0;color:#93a2b9;font-size:10px;}
+.char.ok{color:#16977e;font-weight:800;} .char.bad{color:#c09045;font-weight:800;}
+.checks {display:grid;grid-template-columns:1fr 1fr;gap:8px;}.check {display:flex;gap:6px;align-items:center;font-size:10px;color:#7586a0;}
+.symbol {display:grid;place-items:center;flex:none;width:16px;height:16px;border-radius:50%;background:#edf1f8;color:#98a7b9;font-weight:850;font-size:10px;}
+.symbol.good {background:#e0f7ec;color:#19a482;}
+.step-list {display:flex;gap:8px;flex-wrap:wrap;}.step {display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#a3afc1;}
+.step:before {content:"";display:block;width:6px;height:6px;border-radius:50%;background:#cbd4e1;}
+.step.active {color:#5588d8;font-weight:770;} .step.active:before {background:#5c94ec;}
+.step.done {color:#1e9e83;font-weight:770;} .step.done:before {background:#18b495;}
+.footer-actions {display:grid;gap:8px;margin-top:4px;}
+.detail-compose {padding:14px 20px 19px;background:linear-gradient(180deg,#fff,#fcfdff);border-top:1px solid var(--line);box-shadow:0 -9px 22px #f1f5fc88;}
+.detail-compose-title {display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;font-size:11px;font-weight:820;}
+.detail-compose .fineprint {margin:8px 0 0;}
+.detail-compose .actions {margin-bottom:8px;}
+.activity {margin-top:23px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;}
+.activity-head {display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid var(--line);}
+.activity-head h2 {font-size:11px;margin:0;letter-spacing:-.01em;}
+.activity-table {width:100%;border-collapse:collapse;min-width:350px;} .activity-table thead {background:#fbfdff;}
+.activity-table th {text-align:left;font-size:9px;color:#9aa8bd;font-weight:800;padding:10px 12px;border-bottom:1px solid var(--line);}
+.activity-table td {font-size:10px;color:#798ba3;padding:10px 12px;border-bottom:1px solid #f2f5fb;vertical-align:top;}
+.activity-table tbody tr:last-child td {border-bottom:0;} .activity-table td strong {font-size:10px;color:#425a7d;}
+.empty-row {text-align:center;color:#a1adc1!important;padding:20px 10px!important;}
+.footnote {font-size:9px;color:#b6c1d0;letter-spacing:.025em;margin:13px 0;}
+.toast {position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);z-index:10;opacity:0;pointer-events:none;background:#233c61;color:white;border-radius:9px;box-shadow:0 14px 35px #263b5e3f;padding:11px 17px;font-size:11px;max-width:min(520px,calc(100vw - 40px));transition:opacity .16s,transform .16s;text-align:center;}
+.toast.show {opacity:1;transform:translate(-50%,0);}
+@media(max-width:1250px){.shell{margin:15px;min-height:calc(100vh - 30px);grid-template-columns:165px minmax(300px,1fr) minmax(350px,.95fr)}.sidebar{padding:17px 9px;}.logo{padding:0 8px}.main{padding:18px 16px}.detail-top{padding:18px 15px 15px}.detail-metadata{padding:14px 15px}.detail-scroll{padding:17px 15px}.detail-compose{padding:14px 15px}.nav-item{padding:10px 9px;font-size:11px}.stats{flex-wrap:wrap}}
+@media(max-width:950px){.shell{grid-template-columns:170px minmax(0,1fr);overflow:visible}.sidebar{grid-row:1 / span 2;}.main{border-right:0;}.detail{grid-column:2;max-height:none;min-height:0;border-top:1px solid var(--line)}.detail-scroll{overflow:visible}.detail-compose{position:relative}.sidebar{min-height:100%;}}
+@media(max-width:650px){.shell{display:block;margin:0;border:0;border-radius:0;box-shadow:none}.sidebar{min-height:0;padding:12px 15px;border:0;border-bottom:1px solid var(--line);}.sidebar .nav,.sidebar .nav-section,.sidebar-status,.sidebar-spacer,.profile{display:none}.logo{margin:0;min-height:33px}.main{padding:17px 16px 22px}.page-heading{margin:18px 0 14px}.page-heading h1{font-size:22px}.video-card{padding:11px 0}.thumb{height:54px;width:83px}.detail{min-height:0}.detail-metadata{grid-template-columns:1.3fr 1fr 1fr;gap:0}.detail-top{padding:19px 16px 15px}.detail-scroll{padding:16px}.detail-compose{padding:16px}.checks{grid-template-columns:1fr 1fr}.stat{font-size:9px}.footnote{line-height:1.6}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head><body>
+<div class="shell">
+  <aside class="sidebar" aria-label="대시보드 탐색">
+    <a class="logo" href="#videos" aria-label="Marketing Agent 대시보드">
+      <span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="m7 14 3-4 3 3 4-5"/></svg></span>
+      <span><span class="logo-name" style="display:block">Marketing AI</span><span class="logo-sub" style="display:block">AGENT WORKSPACE</span></span>
+    </a>
+    <div class="nav-section">WORKSPACE</div>
+    <nav class="nav" aria-label="주 메뉴">
+      <a class="nav-item active" href="#videos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>대시보드</a>
+      <a class="nav-item" href="#videos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>영상 목록<span class="nav-count" id="statVideos">0</span></a>
+      <a class="nav-item" href="#analysis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 9.5 9.5 3 12l6.5 2.5L12 21l2.5-6.5L21 12l-6.5-2.5z"/><path d="M5 3v4M3 5h4"/></svg>AI 분석</a>
+      <a class="nav-item" href="#composer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM8 10h8M8 14h5"/></svg>댓글 검토</a>
+      <a class="nav-item" href="#activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18h16M8 16v-5M12 16V7M16 16v-8"/></svg>작업 이력</a>
+    </nav>
+    <div class="nav-section">ENVIRONMENT</div>
+    <div class="nav">
+      <a class="nav-item" href="#modelInfo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>로컬 AI 모델</a>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-status" id="modelInfo"><div class="sidebar-status-label"><span class="dot"></span>Ollama · 연결 전</div><p>qwen2.5-coder:7b · UI 시안</p></div>
+    <div class="profile"><div class="avatar">MA</div><div><div class="profile-name">Local Workspace</div><div class="profile-role">Static Preview</div></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><path d="m7 10 5 5 5-5"/></svg></div>
+  </aside>
+  <main class="main" id="videos">
+    <div class="search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="10.7" cy="10.7" r="6.6"/><path d="m16 16 4.3 4.3"/></svg><input id="searchInput" type="search" placeholder="영상 제목이나 채널을 검색하세요..." aria-label="영상 검색"/></div>
+    <div class="page-heading"><h1>Video Library</h1><p>영상을 선택하고 AI 분석과 댓글 검토를 진행하세요.</p></div>
+    <div class="topline"><span class="kicker">콘텐츠 관리</span><div class="stats"><span class="stat">오늘 완료 <strong id="statPosts" class="muted-value">0</strong><span> / 10</span></span><span class="stat">채널 <strong>5</strong></span></div></div>
+    <div class="filter" id="filters" aria-label="채널 필터">
+      <button class="chip" data-filter="전체" aria-pressed="true">전체</button><button class="chip" data-filter="외롭여" aria-pressed="false">외롭여</button><button class="chip" data-filter="리즈시절" aria-pressed="false">리즈시절</button><button class="chip" data-filter="러브커넥트" aria-pressed="false">러브커넥트</button><button class="chip" data-filter="연애데이터" aria-pressed="false">연애데이터</button><button class="chip" data-filter="심리조각" aria-pressed="false">심리조각</button>
+    </div>
+    <div class="toolbar"><button class="btn primary" id="loadBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 0 0-14-5L4 8M4 4v4h4M4 13a8 8 0 0 0 14 5l2-2M20 20v-4h-4"/></svg>시연 영상 불러오기</button><button class="btn" id="resetBtn">초기화</button><span class="badge neutral" style="margin-left:auto">DEMO</span></div>
+    <div class="tools"><input id="urlInput" class="input" placeholder="YouTube 링크 직접 입력 · 실제 앱에서 연결" aria-label="YouTube 영상 링크"/><button class="btn" id="linkBtn" aria-label="영상 링크 검증">→</button></div>
+    <div class="list-label"><span class="kicker">Video List</span><span class="count mono" id="videoCount">0개 표시</span></div>
+    <div class="video-list" id="videoList"><div class="blank"><strong>아직 불러온 영상이 없습니다.</strong>시연 영상을 불러오면 목록이 표시됩니다.</div></div>
+    <section class="activity" id="activity"><div class="activity-head"><h2>최근 작업 이력</h2><span class="badge neutral">시연 로그</span></div><div style="overflow-x:auto"><table class="activity-table"><thead><tr><th>시각</th><th>작업 대상</th><th>작업</th><th>결과</th></tr></thead><tbody id="logRows"><tr><td colspan="4" class="empty-row">기록된 시연 작업이 없습니다.</td></tr></tbody></table></div></section>
+    <p class="footnote">MARKETING AI AGENT · STATIC DESIGN PREVIEW · 실제 API 연결 및 게시 기능 없음</p>
+  </main>
+  <aside class="detail" aria-label="AI 분석 및 댓글 상세">
+    <div class="detail-top">
+      <div class="detail-toprow"><span class="detail-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m10 8 6 4-6 4z"/></svg></span><span class="detail-label">AI Content Review</span><span class="detail-id">#LOCAL</span><span class="badge success">Preview</span><span class="detail-right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 6-3 8h18c0-2-3-1-3-8M10 20h4"/></svg><span class="online"><span class="green-dot"></span>Local</span></span></div>
+      <h2 class="detail-title">영상 분석 및 댓글 검토</h2><p class="detail-description">영상을 선택하면 AI 분석 결과와 댓글 초안을 확인할 수 있습니다.</p>
+    </div>
+    <div class="detail-metadata"><div class="meta-item"><p class="meta-label">① 영상 선택</p><div class="meta-value">YouTube 콘텐츠</div></div><div class="meta-item"><p class="meta-label">② 맥락 분석</p><div class="meta-value"><span class="badge neutral" id="analysisStatus">분석 대기</span></div></div><div class="meta-item"><p class="meta-label">③ 댓글 검토</p><div class="meta-value"><span class="badge warn" id="draftStatus">초안 없음</span></div></div></div>
+    <div class="detail-scroll" id="analysis">
+      <article class="panel">
+        <div class="panel-head"><div><div class="panel-no">STEP 02 / ANALYSIS</div><h3 class="panel-title">AI 맥락 분석</h3><p class="panel-desc">선택한 영상에서 연애 고민과 분석 근거를 확인합니다.</p></div><span class="badge neutral">Ollama · 시안</span></div>
+        <div class="panel-body">
+          <div class="selected-header"><span class="selected-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></span><div style="min-width:0"><div class="name" id="selectedTitle">영상이 선택되지 않았습니다.</div><p id="selectedMeta">왼쪽에서 영상을 먼저 선택해 주세요.</p></div></div>
+          <div><div class="section-top"><h3>핵심 연애 고민</h3><span class="badge neutral" id="concernType">대기</span></div><div class="insight"><p class="lead">AI INSIGHT</p><p class="statement" id="concernText">선택한 영상의 핵심 고민이 표시됩니다.</p><div class="note" id="concernNote">실제 분석은 Ollama 연결 후 수행됩니다.</div></div></div>
+          <div><div class="section-top"><h3>분석 근거</h3><span class="badge warn" id="evidenceType">미확인</span></div><div class="evidence" id="evidenceList"><div class="evidence-row"><span class="source">SOURCE</span><p>영상 선택 후 분석을 실행하면 참고한 정보의 출처가 표시됩니다.</p></div></div></div>
+          <div class="callout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8v.5"/></svg><span>자막을 확보하지 못한 영상의 실제 발언·장면은 생성하지 않습니다.</span></div>
+          <button class="btn primary full" id="analyzeBtn">선택 영상 분석 (시연)</button>
+          <span class="fineprint">실제 모델 응답이 아닌 미리 작성된 샘플 분석을 보여줍니다.</span>
+        </div>
+      </article>
+      <div class="divider"></div>
+      <article class="panel" id="composer">
+        <div class="panel-head"><div><div class="panel-no">STEP 03 / COMPOSER</div><h3 class="panel-title">댓글 초안</h3><p class="panel-desc">댓글을 수정하고 게시 전 검토 상태를 관리합니다.</p></div><span class="badge neutral">운명원 · 홍보 고지</span></div>
+        <div class="panel-body">
+          <div class="muted-block fineprint"><strong style="color:#547092">작성 원칙</strong><div style="margin-top:4px">영상 맥락에 맞게 작성하고, 홍보 관계를 명시합니다. 허위 체험담은 사용하지 않습니다.</div></div>
+          <div><div class="draft-head"><span class="draft-label">AI 댓글 초안</span><span class="count">수정 가능</span></div><textarea class="editor" id="draftEditor" disabled spellcheck="false" placeholder="분석 실행 후 댓글 초안이 표시됩니다." aria-label="댓글 초안"></textarea><div class="draft-bottom"><span id="charHint">권장 길이 40~120자</span><span class="char mono" id="charCount">0 / 120</span></div></div>
+          <div><div class="section-top"><h3>작성 조건</h3><span class="count">실시간 검사</span></div><div class="checks"><div class="check"><span id="checkLength" class="symbol">·</span>40~120자</div><div class="check"><span id="checkAd" class="symbol">·</span>광고 관계 명시</div><div class="check"><span id="checkLink" class="symbol">·</span>링크·해시태그 제외</div><div class="check"><span id="checkChosen" class="symbol">·</span>영상 분석 완료</div></div></div>
+          <div><div class="section-top"><h3>진행 상태</h3><span class="count" id="flowStatus">준비 전</span></div><div class="step-list"><span id="step1" class="step">초안 작성</span><span id="step2" class="step">검토 완료</span><span id="step3" class="step">작업 기록</span></div></div>
+        </div>
+      </article>
+    </div>
+    <div class="detail-compose"><div class="detail-compose-title"><span>댓글 작업</span><span class="badge neutral">Manual Review</span></div><div class="actions"><button class="btn" id="regenerateBtn">초안 다시 불러오기</button><button class="btn soft" id="saveBtn">수정 저장</button></div><div class="actions"><button class="btn primary" id="reviewBtn">초안 검토 완료</button><button class="btn" id="openBtn">영상 열기</button></div><p class="fineprint">UI 시안에서는 실제 게시와 브라우저 자동화를 실행하지 않습니다.</p></div>
+  </aside>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>
+    const demoVideos = [
+      {id:'mock-01', channel:'외롭여', name:'[가상] 연락이 줄어든 관계에서 고민해야 할 것', date:'시연 데이터', cover:'a', words:'연락의\n거리', concern:'상대의 연락 빈도가 줄어들었을 때 불안을 어떻게 다룰지 고민합니다.', draft:'[광고] 연락 빈도만으로 마음을 단정하기는 어렵겠죠. 관계의 흐름을 더 이해해 보고 싶다면 운명원의 연애 사주 상담도 한 가지 선택지입니다.'},
+      {id:'mock-02', channel:'리즈시절', name:'[가상] 썸과 연애 사이에서 관계를 정하는 문제', date:'시연 데이터', cover:'b', words:'썸의\n신호', concern:'상대의 애매한 태도 때문에 관계의 방향을 결정하지 못하는 상황입니다.', draft:'[광고] 애매한 관계에서는 상대의 신호를 해석하는 일도 쉽지 않죠. 자신의 연애 고민을 다른 관점에서 살펴보고 싶다면 운명원 연애 사주를 알아볼 수 있습니다.'},
+      {id:'mock-03', channel:'러브커넥트', name:'[가상] 반복되는 이별을 돌아보는 질문', date:'시연 데이터', cover:'c', words:'이별의\n패턴', concern:'비슷한 이유로 관계가 끝나는 일이 반복될 때 자신을 어떻게 돌아볼지 고민합니다.', draft:'[광고] 이별의 이유를 모두 운명으로 돌리기는 어렵지만, 반복되는 관계에서 나를 이해하는 계기는 필요하죠. 운명원의 연애 사주도 살펴볼 수 있습니다.'},
+      {id:'mock-04', channel:'연애데이터', name:'[가상] 표현 방식이 다른 연인의 갈등', date:'시연 데이터', cover:'d', words:'마음의\n표현', concern:'애정 표현 방식의 차이가 관계의 갈등으로 이어지는 문제를 다룹니다.', draft:'[광고] 사랑을 표현하는 방식이 다르면 같은 상황도 다르게 느껴지죠. 서로를 이해하는 방법을 찾는 과정에서 운명원 연애 사주를 참고할 수도 있습니다.'},
+      {id:'mock-05', channel:'심리조각', name:'[가상] 새로운 인연을 시작하기 어려운 이유', date:'시연 데이터', cover:'e', words:'새로운\n인연', concern:'과거 경험 때문에 새로운 연애를 시작하는 것을 망설이는 심리를 다룹니다.', draft:'[광고] 새로운 인연 앞에서 망설이는 마음을 무조건 극복할 필요는 없겠죠. 자신의 연애 고민을 정리해 보고 싶다면 운명원의 연애 사주도 하나의 선택지입니다.'}
+    ];
+    const $ = id => document.getElementById(id);
+    let loaded = false, selectedId = null, activeFilter = '전체', searchText = '', analyzed = false, approved = false, logs = [], toastTimer;
+    const selected = () => demoVideos.find(v=>v.id===selectedId);
+    function notice(message){const n=$('toast');n.textContent=message;n.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>n.classList.remove('show'),3100)}
+    function addLog(action,result){const v=selected();logs.unshift({at:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}), target:v?.name||'시안',action,result});renderLogs()}
+    function renderLogs(){ $('logRows').innerHTML = logs.length ? logs.slice(0,8).map(l=>`<tr><td class="mono">${escapeHtml(l.at)}</td><td><strong>${escapeHtml(l.target)}</strong></td><td>${escapeHtml(l.action)}</td><td>${escapeHtml(l.result)}</td></tr>`).join(''):'<tr><td colspan="4" class="empty-row">기록된 시연 작업이 없습니다.</td></tr>' }
+    function escapeHtml(s){return String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]))}
+    function renderList(){const items = loaded ? demoVideos.filter(v=>(activeFilter==='전체'||v.channel===activeFilter) && (!searchText || (v.name+' '+v.channel).toLocaleLowerCase('ko-KR').includes(searchText))):[];$('videoCount').textContent=`${items.length}개 표시`;$('statVideos').textContent=loaded?demoVideos.length:'0';$('videoList').innerHTML=items.length ? items.map(v=>`<button type="button" class="video-card" data-id="${v.id}" aria-pressed="${v.id===selectedId}" aria-label="${escapeHtml(v.name)} 선택"><div class="thumb ${v.cover}"><span class="thumb-words">${escapeHtml(v.words).replace(/\n/g,'<br>')}</span></div><div class="video-meta"><h3 title="${escapeHtml(v.name)}">${escapeHtml(v.name)}</h3><p>${escapeHtml(v.channel)} · ${v.date}</p><div class="tiny"><span class="badge neutral inline">가상 영상</span>${v.id===selectedId?'<span class="round-check">✓</span>':''}</div></div></button>`).join('') : `<div class="blank"><strong>${loaded?'선택한 채널에 영상이 없습니다.':'아직 불러온 영상이 없습니다.'}</strong>${loaded?'다른 채널을 선택해 주세요.':'시연용 영상을 불러오면 이 영역에 표시됩니다.'}</div>`;document.querySelectorAll('.video-card').forEach(b=>b.addEventListener('click',()=>choose(b.dataset.id)))}
+    function choose(id){selectedId=id;analyzed=false;approved=false;const v=selected();$('selectedTitle').textContent=v.name;$('selectedMeta').textContent=`${v.channel} · 가상 영상 · 미분석`;$('analysisStatus').textContent='분석 대기';$('analysisStatus').className='badge neutral';$('concernType').textContent='대기';$('concernText').textContent='AI 맥락 분석을 실행해 주세요.';$('concernNote').textContent='이 화면의 분석 문구는 실제 모델 응답이 아닙니다.';$('evidenceType').textContent='미확인';$('evidenceType').className='badge warn';$('evidenceList').innerHTML='<div class="evidence-row"><span class="source">SOURCE</span><p>시연 데이터에는 검증된 실제 영상 자막·설명이 없습니다.</p></div>';$('draftEditor').value='';$('draftEditor').disabled=true;$('draftStatus').textContent='초안 없음';$('draftStatus').className='badge warn';$('flowStatus').textContent='영상 선택됨';renderList();updateDraft()}
+    function analyze(){const v=selected();if(!v){notice('먼저 영상을 선택해 주세요.');return}analyzed=true;approved=false;$('analysisStatus').textContent='시연 분석';$('analysisStatus').className='badge';$('concernType').textContent='샘플 결과';$('concernText').textContent=v.concern;$('concernNote').textContent='이 고민 요약은 실제 영상 분석이 아닌 디자인 검토용 가상 내용입니다.';$('evidenceType').textContent='실제 근거 없음';$('evidenceType').className='badge warn';$('evidenceList').innerHTML='<div class="evidence-row"><span class="source">DEMO / NO VERIFIED TRANSCRIPT</span><p>시연 시안이므로 원문 인용을 표시하지 않습니다. 실서비스는 실제 출처와 검증된 인용문을 이곳에 노출합니다.</p></div>';$('draftEditor').disabled=false;$('draftEditor').value=v.draft;$('draftStatus').textContent='검토 필요';$('draftStatus').className='badge warn';$('flowStatus').textContent='초안 작성됨';updateDraft();addLog('시연 분석','사전 작성된 가상 결과 표시');notice('시연용 분석 결과와 초안을 표시했습니다.')}
+    function updateDraft(){const value=$('draftEditor').value;const count=Array.from(value).length;const validLength=count>=40&&count<=120;const ad=/\[(광고|홍보)\]|광고|홍보/.test(value);const links=/(https?:\/\/|www\.|#[^\s#]+)/i.test(value);const checks=[validLength,ad,!links&&count>0,!!selected()&&analyzed];['checkLength','checkAd','checkLink','checkChosen'].forEach((id,i)=>{ $(id).textContent=checks[i]?'✓':'·';$(id).className='symbol'+(checks[i]?' good':'') });$('charCount').textContent=`${count} / 120`;$('charCount').className='char mono '+(validLength?'ok':'bad');$('charHint').textContent=count>120?'최대 120자를 초과했습니다.':count>0&&count<40?'최소 40자가 필요합니다.':'권장 길이 40~120자';$('reviewBtn').disabled=!checks.every(Boolean);$('saveBtn').disabled=!analyzed;$('regenerateBtn').disabled=!analyzed;$('openBtn').disabled=!approved;['step1','step2','step3'].forEach((id,i)=>$(id).className='step'+(i===0&&analyzed?' done':i===1&&approved?' done':''));if(analyzed&&!approved)$('step2').className='step active';if(approved)$('step3').className='step active'}
+    $('loadBtn').addEventListener('click',()=>{loaded=true;renderList();notice('가상 영상 5개를 불러왔습니다. 실제 API 호출은 수행하지 않았습니다.')});
+    $('resetBtn').addEventListener('click',()=>{loaded=false;selectedId=null;analyzed=false;approved=false;activeFilter='전체';searchText='';$('searchInput').value='';logs=[];document.querySelectorAll('[data-filter]').forEach(e=>e.setAttribute('aria-pressed',String(e.dataset.filter==='전체')));$('selectedTitle').textContent='영상이 선택되지 않았습니다.';$('selectedMeta').textContent='왼쪽에서 영상을 먼저 선택해 주세요.';$('analysisStatus').textContent='분석 대기';$('analysisStatus').className='badge neutral';$('concernText').textContent='선택한 영상의 핵심 고민이 표시됩니다.';$('concernNote').textContent='실제 분석은 Ollama 연결 후 수행됩니다.';$('concernType').textContent='대기';$('evidenceType').textContent='미확인';$('evidenceType').className='badge warn';$('evidenceList').innerHTML='<div class="evidence-row"><span class="source">SOURCE</span><p>영상 선택 후 분석을 실행하면 참고한 정보의 출처가 표시됩니다.</p></div>';$('draftEditor').value='';$('draftEditor').disabled=true;$('draftStatus').textContent='초안 없음';$('draftStatus').className='badge warn';$('flowStatus').textContent='준비 전';$('urlInput').value='';renderList();renderLogs();updateDraft();notice('시연 화면을 초기화했습니다.')});
+    document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{activeFilter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));renderList()}));
+    $('searchInput').addEventListener('input',e=>{searchText=e.target.value.trim().toLocaleLowerCase('ko-KR');renderList()});
+    $('linkBtn').addEventListener('click',()=>notice('시안에서는 URL 검증을 수행하지 않습니다. 실제 앱에서 채널 ID를 검증합니다.'));
+    $('analyzeBtn').addEventListener('click',analyze);
+    $('draftEditor').addEventListener('input',()=>{if(approved){approved=false;$('draftStatus').textContent='재검토 필요';$('draftStatus').className='badge warn'}updateDraft()});
+    $('regenerateBtn').addEventListener('click',()=>{const v=selected();if(!v)return;$('draftEditor').value=v.draft;updateDraft();notice('사전 작성된 시연용 초안을 다시 불러왔습니다.')});
+    $('saveBtn').addEventListener('click',()=>{if(!analyzed)return;addLog('초안 수정','시연 화면에만 반영 · 서버 저장 안 됨');notice('시안 내부에서 수정 내용을 유지합니다. 실제 DB에는 저장되지 않습니다.')});
+    $('reviewBtn').addEventListener('click',()=>{approved=true;updateDraft();$('draftStatus').textContent='시연 검토 완료';$('draftStatus').className='badge success';$('flowStatus').textContent='브라우저 연결 전';addLog('초안 검토','시연용 검토 완료 · 게시 안 함');notice('초안 검토 상태만 갱신했습니다. 실제 게시 작업은 없습니다.')});
+    $('openBtn').addEventListener('click',()=>notice('이 HTML은 디자인 시안입니다. 실제 영상 링크 열기는 구현 앱에서만 수행됩니다.'));
+    document.querySelectorAll('.nav-item[href]').forEach(link=>link.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));link.classList.add('active')}));
+    renderList();updateDraft();
+  </script></body></html>

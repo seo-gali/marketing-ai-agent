@@ -1,0 +1,72 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+credentials.json
+client_secret*.json
+*token*.json
+
+# Node.js / Vite
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local databases and transient state
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-journal
+*.db-shm
+*.db-wal
+
+# Browser profiles and authentication
+playwright/.auth/
+.auth/
+user-data/
+chrome-profiles/
+browser-profiles/
+
+# Test and runtime artifacts
+test-results/
+playwright-report/
+blob-report/
+artifacts/
+tmp/
+temp/
+
+# Local source assignment (not for public redistribution)
+docs/reference/track-2-marketing-agent.pdf
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
