@@ -44,6 +44,7 @@ screenshots/
 playwright-report/
 test-results/
 artifacts/
+.playwright-mcp/
 
 # IDE and OS
 .idea/

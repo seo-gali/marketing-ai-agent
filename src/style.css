@@ -1,0 +1,2 @@
+:root { font-family: 'Malgun Gothic', system-ui, sans-serif; color: #182b48; background: #f2f6fc; }
+body { margin: 0; } main { padding: 32px; } button, input, textarea { font: inherit; }
