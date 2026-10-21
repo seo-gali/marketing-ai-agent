@@ -2,9 +2,9 @@
 
 YouTube 영상 조회·Ollama 분석·광고 댓글 검토·Chrome 게시용 Windows 11 로컬 대시보드
 
-- 검증 완료: 실제 API 조회·Ollama 추론·초안 저장·게시 규칙·화면 E2E·프로덕션 빌드
-- 미검증: 로그인된 지정 프로필의 실제 YouTube 게시·댓글 확인
-- 미구현: 자막 수집·실제 장면/발언 검증·2~3분 실게시 시연 영상
+- 검증 완료: 실제 API 조회·Ollama 추론·초안 저장·게시 규칙·실제 YouTube 입력·게시·댓글 확인
+- 영상 근거: 공개 자막 우선 · 조회 실패 시 초반 네 구간의 화면 자막·시각·캡처 수집 · 연애 영상 2건 검증
+- 미완료: 2~3분 실게시 시연 영상·스크린리더 실기기 검수
 - 운영 방식: 광고 표시·본문 승인 후 게시
 
 ## 기술 구성
@@ -21,6 +21,7 @@ YouTube 영상 조회·Ollama 분석·광고 댓글 검토·Chrome 게시용 Win
 ## 준비 환경
 
 - Windows 11 · Node 24 · Python 3.13 · Google Chrome
+- Windows 한국어 OCR 언어 · 영상 화면 문구 수집용
 - Ollama 실행 및 `qwen2.5-coder:7b` 설치
 - YouTube Data API v3 활성화 및 API 키
 - 본인 소유 테스트 영상 ID
@@ -66,10 +67,26 @@ npm.cmd run build
 - Windows 파일 잠금 예방: `npm ci` 실행 전 Vite 종료
 - 실행 조건: 서버 1프로세스 · loopback 전용 · 외부 프록시 공개 제외
 
+## 최초 로그인
+
+Google의 자동 제어 브라우저 로그인 거부 시, 지정 프로필의 일반 Chrome 직접 로그인
+
+```powershell
+$loginProfilePath=(./.venv/Scripts/python.exe -c "from backend.config import PROFILE_PATH; print(PROFILE_PATH)").Trim()
+& "$env:ProgramFiles/Google/Chrome/Application/chrome.exe" "--user-data-dir=$loginProfilePath" "--profile-directory=Default" "https://www.youtube.com/?hl=ko"
+```
+
+1. 앱의 전용 Chrome 종료
+2. 위 명령의 지정 프로필에서 YouTube 직접 로그인
+3. 해당 프로필의 Chrome 창 전체 종료
+4. 앱의 전용 Chrome 열기·게시 진행
+
+인증 처리: 사용자 직접 입력 · 동일 지정 프로필 · 기본 프로필 변경·쿠키 복사·보안 우회 옵션 없음
+
 ## 사용 순서
 
 1. 영상 불러오기: 지정 5채널 최신 영상 · 채널 필터 · 제목 검색 · URL 입력
-2. 영상 선택: 실제 자료 수집 · 고민/초안 생성 · 출처 확인 · 초안 편집
+2. 영상 선택: 자막·화면 근거 수집 · 고민/초안 생성 · 시각/캡처 확인 · 초안 편집
 3. 댓글 달기: 지정 Chrome 로그인 · 광고 본문 승인 · 글자별 입력 · 게시 · 결과 확인
 
 추가 동작
@@ -101,20 +118,22 @@ npm.cmd run build
 ./.venv/Scripts/python.exe -m unittest discover -s tests -v
 ./.venv/Scripts/python.exe scripts/verify_e2e.py
 ./.venv/Scripts/python.exe scripts/verify_accessibility.py
+./.venv/Scripts/python.exe scripts/verify_analysis_e2e.py
 ./.venv/Scripts/python.exe scripts/verify_docs.py
 npm.cmd run build
 npm.cmd audit
 ./.venv/Scripts/python.exe -m pip check
 ```
 
-- Python 검사: 게시 규칙·동시성·날짜 변경·이력 페이지·격리 브라우저·보안 경계
+- Python 검사: 19건 통과 · 게시 규칙·동시성·날짜 변경·인용 위조 차단·격리 브라우저·보안 경계
 - 화면 E2E: 실제 5채널 40영상 · 편집/임시 저장 · 빈 검색어 · 승인 초기화 · 차단 응답 · 반응형
 - 접근성: 키보드 메뉴·본문 이동·포커스·접근성 트리·레이블·주요 텍스트 대비
 - 소개 페이지: 탭·실제 Markdown 문서 4개·팝업 포커스·모바일·오류 복구·HTML 실행 차단
 - 방어: 경로별 요청 제한·16KB 본문 상한·Host/Origin/접속 주소 검사·CSP·프레임 차단
 - 의존성 검사: 알려진 취약점 0건 · 별도 개발 도구 `pip-audit` 검사 포함
-- 검사 한계: 실제 게시·NVDA/JAWS 실기기·공개 배포 침투·대규모 부하 미검증
+- 검사 한계: NVDA/JAWS 실기기·공개 배포 침투·대규모 부하 미검증
 - 자동 검증의 외부 댓글 게시: 미실행
+- 실계정 별도 검증: 승인 본문 1회 게시·새로고침 확인·사용자의 다른 계정 공개 확인
 
 ## 로컬 데이터·백업
 
@@ -145,8 +164,8 @@ Git 제외: `.env`·API 키·Chrome 인증정보·DB·캡처·로컬 백업·과
 
 ## 남은 항목
 
-- 실제 YouTube 입력·게시·댓글 확인 E2E 및 2~3분 시연 영상
-- 자막 수집·구체적 장면/발언 확인
+- 2~3분 실제 게시 시연 영상
+- 자막·OCR 인용과 실제 화면의 사용자 대조 · 전체 영상 장면 분석 제외
 - 가점: 프로필 2·3 선택/배정 · 뜨기 직전 영상 탐색
 - 모델의 의미적 사실성에 대한 사용자 검토
 - 인터넷 공개 전 별도 인증·권한 설계

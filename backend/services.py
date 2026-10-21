@@ -1,5 +1,8 @@
 import json
 import re
+import os
+import subprocess
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode, urlparse, parse_qs
 from urllib.error import HTTPError, URLError
@@ -8,6 +11,21 @@ from urllib.request import Request, urlopen
 from fastapi import HTTPException
 
 from . import config
+
+
+def ocr_frame(path):
+    image = Path(path).resolve()
+    if not image.is_relative_to(config.ROOT / 'local' / 'screenshots') or image.suffix != '.png':
+        raise ValueError('영상 캡처 경로만 OCR에 사용할 수 있습니다.')
+    shell = Path(os.environ.get('SystemRoot', 'C:/Windows')) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    try:
+        result = subprocess.run([str(shell), '-NoProfile', '-NonInteractive', '-File', str(config.ROOT / 'scripts/ocr_frame.ps1'),
+                                 '-ImagePath', str(image)], capture_output=True, encoding='utf-8', timeout=25,
+                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0, check=True)
+        lines = json.loads(result.stdout.lstrip('\ufeff'))['lines']
+        return [line for line in lines if len(re.findall('[가-힣]', line)) >= 5 and re.fullmatch(r'[가-힣\s\d.,!?…“”‘’·]+', line)]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
+        raise HTTPException(503, 'Windows 한국어 OCR 실행 실패. 한국어 OCR 언어와 로컬 스크립트 실행 정책을 확인하세요.') from None
 
 
 def request_json(url: str, payload=None, timeout=20, headers=None):

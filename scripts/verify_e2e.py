@@ -51,13 +51,13 @@ async def main():
             await page.get_by_role('button',name='전체 목록 보기',exact=True).click()
             result['checks'].append({'filter_and_empty_search': 'passed', 'empty_query_api':422})
             await page.get_by_text('더보기 · 영상 URL로 선택',exact=True).click()
-            await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/DPFhGxGM8qQ')
+            await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/akn-AvCeHBI')
             await page.get_by_role('button', name='링크 확인').click()
             await expect(page.locator('#draft')).not_to_have_value('',timeout=240000)
             assert await page.get_by_role('button',name='실행 취소',exact=True).count()==0
             draft = await page.locator('#draft').input_value()
             assert 40 <= len(draft) <= 120 and draft.startswith('[광고]') and '운명원' in draft
-            await page.get_by_text('연애 고민 확인 불가', exact=True).wait_for()
+            await expect(page.locator('#analysis-title')).to_have_text('남자의 연애 작동원리')
             button = page.get_by_role('button', name='③ 댓글 달기', exact=True)
             assert await button.is_disabled()
             approval = page.get_by_role('checkbox', name='현재 본문을 확인했으며 광고 댓글 게시를 승인합니다.')
@@ -73,13 +73,13 @@ async def main():
             await page.get_by_role('button', name='수정 저장').click()
             await page.wait_for_timeout(300)
             result['checks'].append({'draft_edit_and_approval_reset': 'passed', 'draft_length': len(draft)})
-            edited=draft.replace('시간여행자를','제목의 시간여행자를')
+            edited=draft.replace('운명원','운명원의')
             await page.locator('#draft').fill(edited)
             await expect(page.get_by_text('이 브라우저에 임시 저장됨 · 7일 보관',exact=True)).to_be_visible()
-            assert await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:DPFhGxGM8qQ')).text")==edited
+            assert await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:akn-AvCeHBI')).text")==edited
             await page.reload()
             await page.get_by_text('더보기 · 영상 URL로 선택',exact=True).click()
-            await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/DPFhGxGM8qQ')
+            await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/akn-AvCeHBI')
             await page.get_by_role('button',name='링크 확인',exact=True).click()
             await expect(page.locator('#draft')).to_have_value(edited)
             assert not await page.get_by_role('checkbox').is_checked()
@@ -87,15 +87,15 @@ async def main():
             await page.get_by_role('button',name='수정 저장').click()
             result['checks'].append({'local_draft_recovery_without_approval':'passed'})
             rejected = await page.request.post(BASE + '/api/posting-jobs', data={
-                'video_id': 'DPFhGxGM8qQ', 'text': draft, 'approved': False})
+                'video_id': 'akn-AvCeHBI', 'text': draft, 'approved': False})
             assert rejected.status == 422
             forbidden = await page.request.post(BASE + '/api/posting-jobs', data={
                 'video_id': 'jNQXAC9IVRw', 'text': draft, 'approved': True})
             assert forbidden.status == 403
-            invalid = await page.request.post(BASE + '/api/videos/resolve', data={'url': 'https://evil.example/watch?v=DPFhGxGM8qQ'})
+            invalid = await page.request.post(BASE + '/api/videos/resolve', data={'url': 'https://evil.example/watch?v=akn-AvCeHBI'})
             assert invalid.status == 422
             origin = await page.request.post(BASE + '/api/posting-jobs', headers={'Origin': 'https://evil.example'}, data={
-                'video_id': 'DPFhGxGM8qQ', 'text': draft, 'approved': True})
+                'video_id': 'akn-AvCeHBI', 'text': draft, 'approved': True})
             assert origin.status == 403
             result['checks'].append({'approval_required': 422, 'channel_denied': 403, 'invalid_url': 422, 'origin_denied': 403})
             for width in [1440, 1024, 390]:

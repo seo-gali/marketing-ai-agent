@@ -63,11 +63,12 @@ def get_video(video_id: str):
 
 
 @app.post('/api/videos/{video_id}/analyze')
-def analyze_video(video_id: str):
+async def analyze_video(video_id: str):
     try:
-        video = services.fetch_video(video_id)
+        video = await asyncio.to_thread(services.fetch_video, video_id)
         db.save_videos([video])
-        result = analysis.generate(video)
+        transcript, warnings = await browser.collect_video_evidence(video)
+        result = await asyncio.to_thread(analysis.generate, video, transcript, warnings)
         db.log('analysis_complete', '실제 Ollama 분석 및 초안 저장', video['id'])
         return result
     except HTTPException as error:
