@@ -71,15 +71,34 @@ async def verify():
                     assert (await refreshed.value).status == 200
                     await expect(page.locator('.api-connection .status-dot')).to_have_class('status-dot on')
                     await expect(page.locator('.api-connection')).to_contain_text('API 연결됨')
-                    await page.route('**/api/health', lambda route: route.fulfill(status=503, json={'detail':'검증용 오류'}))
+                    services = page.locator('.connection-head:not(.api-connection)')
+                    service_text = await services.all_inner_texts()
+                    service_dots = await services.locator('.status-dot').evaluate_all('items=>items.map(item=>item.className)')
+                    started = asyncio.Event()
+                    release = asyncio.Event()
+
+                    async def delayed_api_error(route):
+                        started.set()
+                        await release.wait()
+                        await route.fulfill(status=503, json={'detail':'검증용 오류'})
+
+                    await page.route('**/api/health', delayed_api_error)
                     await page.get_by_role('button', name='API 상태 확인', exact=True).click()
+                    await asyncio.wait_for(started.wait(), timeout=10)
+                    await expect(page.locator('.api-connection')).to_contain_text('API 확인 중')
+                    assert await services.all_inner_texts() == service_text
+                    assert await services.locator('.status-dot').evaluate_all('items=>items.map(item=>item.className)') == service_dots
+                    release.set()
                     await expect(page.locator('.api-connection .status-dot')).to_have_class('status-dot off')
                     await expect(page.locator('.api-connection')).to_contain_text('API 연결 실패')
+                    assert await services.all_inner_texts() == service_text
+                    assert await services.locator('.status-dot').evaluate_all('items=>items.map(item=>item.className)') == service_dots
                     await page.unroute('**/api/health')
                     await page.get_by_role('button', name='API 상태 확인', exact=True).click()
                     await expect(page.locator('.api-connection .status-dot')).to_have_class('status-dot on')
+                    assert await services.all_inner_texts() == service_text
                     assert len(chrome.contexts[0].pages) == 1
-                    result['checks'].append('api_check_200_green_503_red_retry_without_new_tab')
+                    result['checks'].append('api_check_only_own_row_during_pending_failure_and_recovery_without_new_tab')
                     for name in ['유튜브2', '유튜브3']:
                         await page.get_by_role('button', name=name + ' 추가', exact=True).click()
                         await expect(page.get_by_role('radio', name=name, exact=False)).to_be_visible()

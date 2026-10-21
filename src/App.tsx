@@ -31,6 +31,7 @@ export default function App() {
   const [health,setHealth]=useState<Health>()
   const [healthLoading,setHealthLoading]=useState(false)
   const [apiConnected,setApiConnected]=useState<boolean|null>(null)
+  const [apiChecking,setApiChecking]=useState(false)
   const [theme,setTheme]=useState(readTheme)
   const [profiles,setProfiles]=useState<string[]>(['유튜브1'])
   const [profile,setProfile]=useState(readProfile)
@@ -103,6 +104,14 @@ export default function App() {
       const data:Health=await response.json().catch(()=>{throw new Error('API 응답을 읽을 수 없습니다.')})
       setHealth(data);setApiConnected(true)
     } catch(problem) {setHealth(undefined);setApiConnected(false);fail(problem)} finally {setHealthLoading(false)}
+  }
+  async function checkApi() {
+    setApiChecking(true);setError('')
+    try {
+      const response=await fetch('/api/health')
+      if(response.status!==200) throw new Error(`API 연결 확인 실패 (HTTP ${response.status}). 다시 확인하세요.`)
+      setApiConnected(true)
+    } catch(problem) {setApiConnected(false);fail(problem)} finally {setApiChecking(false)}
   }
   useEffect(()=>{
     document.documentElement.dataset.theme=theme
@@ -255,10 +264,10 @@ export default function App() {
       <nav id="main-navigation" aria-label="주 메뉴">{[['/','grid','영상 탐색'],['/activities','clock','작업 이력'],['/settings','settings','환경 설정']].map(([destination,icon,label])=><a className={`nav-item ${path===destination?'active':''}`} href={destination} key={destination} onClick={event=>follow(event,destination)} aria-current={path===destination?'page':undefined}><Icon name={icon}/>{label}</a>)}</nav>
       <div className="sidebar-bottom">
         <section className="connection-box" aria-label="연결 상태" aria-busy={healthLoading}>
-          <div className="connection-toolbar"><strong>연결 상태</strong><button className="icon-button" aria-label="연결 상태 새로고침" title="연결 상태 새로고침" disabled={healthLoading} onClick={()=>void refreshHealth()}><Icon name="refresh" size={15}/></button></div>
+          <div className="connection-toolbar"><strong>연결 상태</strong><button className="icon-button" aria-label="연결 상태 새로고침" title="연결 상태 새로고침" disabled={healthLoading||apiChecking} onClick={()=>void refreshHealth()}><Icon name="refresh" size={15}/></button></div>
           <div className="connection-head"><span className={`status-dot ${health?.ollama==='ready'?'on':''}`}/>Ollama {healthLoading?'확인 중':health?.ollama==='ready'?'연결됨':'확인 필요'}</div><p>{health?.model??'연결 확인 중'}</p>
           <div className="connection-head"><span className={`status-dot ${health?.youtube==='configured'?'on':''}`}/>YouTube API {healthLoading?'확인 중':health?.youtube==='configured'?'키 설정됨':'확인 필요'}</div>
-          <div className="connection-head api-connection"><span className={`status-dot ${healthLoading?'':apiConnected===true?'on':apiConnected===false?'off':''}`}/><span role="status">API {healthLoading?'확인 중':apiConnected===true?'연결됨':apiConnected===false?'연결 실패':'미확인'}</span><button className="connection-check" aria-label="API 상태 확인" disabled={healthLoading} onClick={()=>void refreshHealth()}>확인</button></div>
+          <div className="connection-head api-connection" aria-busy={healthLoading||apiChecking}><span className={`status-dot ${healthLoading||apiChecking?'':apiConnected===true?'on':apiConnected===false?'off':''}`}/><span role="status">API {healthLoading||apiChecking?'확인 중':apiConnected===true?'연결됨':apiConnected===false?'연결 실패':'미확인'}</span><button className="connection-check" aria-label="API 상태 확인" disabled={healthLoading||apiChecking} onClick={()=>void checkApi()}>확인</button></div>
         </section>
         <div className="user-chip"><span className="avatar"><Icon name="user"/></span><span><strong>Local Operator</strong><span>광고 콘텐츠 · 승인 후 게시</span></span></div>
       </div>

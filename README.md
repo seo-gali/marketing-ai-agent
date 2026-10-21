@@ -103,6 +103,7 @@ $loginProfilePath=(./.venv/Scripts/python.exe -c "from backend.config import PRO
 - 임시 저장: 영상별 localStorage · 7일 만료 · 앱 시작/영상 선택 시 만료본 삭제
 - 환경 설정: 라이트·다크 테마 · 브라우저별 테마·게시 프로필 선택 유지
 - 연결 상태: 사이드바의 Ollama·YouTube·API 상태등 · 확인 버튼의 HTTP 200 응답 확인 · 실패 시 빨간불·재확인
+- 개별 확인: API 행만 갱신 · 상단 새로고침: 연결 상태 전체 갱신
 - 채널 추가 탭: YouTube 영상 링크 입력·조회 결과 별도 표시 · 지정 채널 목록·검색 상태 유지
 - 검색·필터: 브라우저 저장 · 초기화·실행 취소
 - 모바일: 메뉴 열기/닫기 · 단일 열 · 키보드 포커스
