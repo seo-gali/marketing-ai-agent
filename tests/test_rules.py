@@ -94,8 +94,8 @@ class PostingRules(unittest.TestCase):
     def test_history_is_bounded_and_paginated(self):
         for index in range(20):
             db.log('fixture',str(index))
-        first=db.activities(limit=7)
-        second=db.activities(offset=7,limit=7)
+        first=db.activities(limit=7,kind='logs')
+        second=db.activities(offset=7,limit=7,kind='logs')
         self.assertEqual(len(first['logs']),7)
         self.assertTrue(first['has_more'])
         self.assertEqual(first['total_pages'],3)

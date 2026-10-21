@@ -60,7 +60,39 @@ def initialize():
             CREATE INDEX IF NOT EXISTS jobs_created ON posting_jobs(created_at DESC);
             CREATE INDEX IF NOT EXISTS drafts_text ON comment_drafts(text);
             CREATE INDEX IF NOT EXISTS jobs_text ON posting_jobs(text) WHERE status<>'failed';
+            CREATE TABLE IF NOT EXISTS browser_profiles (name TEXT PRIMARY KEY);
+            INSERT OR IGNORE INTO browser_profiles(name) VALUES ('유튜브1');
         ''')
+        for table in ('posting_jobs', 'activity_logs'):
+            if 'hidden_by' not in {row['name'] for row in connection.execute(f'PRAGMA table_info({table})')}:
+                connection.execute(f'ALTER TABLE {table} ADD COLUMN hidden_by TEXT')
+        connection.execute('CREATE INDEX IF NOT EXISTS jobs_visibility_created ON posting_jobs(hidden_by,created_at DESC,id DESC)')
+        connection.execute('CREATE INDEX IF NOT EXISTS logs_visibility_id ON activity_logs(hidden_by,id DESC)')
+
+
+def profiles():
+    with connect() as connection:
+        return [row[0] for row in connection.execute('SELECT name FROM browser_profiles ORDER BY name')]
+
+
+def add_profile(name):
+    from fastapi import HTTPException
+    if name not in config.PROFILE_NAMES:
+        raise HTTPException(422, '유튜브1·2·3만 지원합니다.')
+    if name != '유튜브1' and config.profile_path(name) == config.PROFILE_PATH:
+        raise HTTPException(409, '기존 유튜브1과 같은 폴더입니다. 프로필 설정을 확인하세요.')
+    with connect() as connection:
+        try:
+            connection.execute('INSERT INTO browser_profiles(name) VALUES (?)', (name,))
+        except sqlite3.IntegrityError:
+            raise HTTPException(409, '이미 추가된 프로필입니다.') from None
+    return profiles()
+
+
+def require_profile(name):
+    from fastapi import HTTPException
+    if name not in config.PROFILE_NAMES or name not in profiles():
+        raise HTTPException(422, '환경 설정에서 추가한 Chrome 프로필을 선택하세요.')
 
 
 def save_videos(videos):
@@ -118,8 +150,7 @@ def reserve_job(video, text, approved, profile='유튜브1'):
     text = validate_comment(text)
     if approved is not True:
         raise HTTPException(422, '광고 댓글 본문에 대한 명시적인 게시 승인이 필요합니다.')
-    if profile != '유튜브1':
-        raise HTTPException(422, '유튜브1 전용 프로필만 지원합니다.')
+    require_profile(profile)
     if not allowed(video):
         raise HTTPException(403, '허용 채널 또는 등록된 본인 테스트 영상에만 게시할 수 있습니다.')
     if duplicate_draft(video['id'], text):
@@ -187,13 +218,39 @@ def video_job(video_id):
         return dict(row) if row else None
 
 
-def activities(offset=0, limit=30):
+def activities(offset=0, limit=30, kind='jobs'):
     with connect() as connection:
         jobs = [dict(row) for row in connection.execute('''SELECT j.*,v.title FROM posting_jobs j
-                LEFT JOIN videos v ON v.id=j.video_id ORDER BY j.created_at DESC LIMIT ? OFFSET ?''', (limit + 1, offset))]
-        logs = [dict(row) for row in connection.execute('SELECT * FROM activity_logs ORDER BY id DESC LIMIT ? OFFSET ?', (limit + 1, offset))]
-        total = connection.execute('SELECT max((SELECT count(*) FROM posting_jobs),(SELECT count(*) FROM activity_logs))').fetchone()[0]
+                LEFT JOIN videos v ON v.id=j.video_id WHERE j.hidden_by IS NULL ORDER BY j.created_at DESC,j.id DESC LIMIT ? OFFSET ?''', (limit + 1, offset))]
+        logs = [dict(row) for row in connection.execute('''SELECT l.*,v.title FROM activity_logs l LEFT JOIN videos v ON v.id=l.video_id
+                WHERE l.hidden_by IS NULL ORDER BY l.id DESC LIMIT ? OFFSET ?''', (limit + 1, offset))]
+        table = 'posting_jobs' if kind == 'jobs' else 'activity_logs'
+        total = connection.execute(f'SELECT count(*) FROM {table} WHERE hidden_by IS NULL').fetchone()[0]
         used = connection.execute("SELECT count(*) FROM posting_jobs WHERE local_day=? AND status<>'failed'", (today(),)).fetchone()[0]
         blocked = [row[0] for row in connection.execute("SELECT video_id FROM posting_jobs WHERE status<>'failed' ORDER BY created_at DESC LIMIT 100")]
-        return {'jobs': jobs[:limit], 'logs': logs[:limit], 'has_more': len(jobs) > limit or len(logs) > limit, 'total_pages': max(1, (total + limit - 1) // limit),
+        return {'jobs': jobs[:limit], 'logs': logs[:limit], 'has_more': len(jobs if kind == 'jobs' else logs) > limit, 'total_pages': max(1, (total + limit - 1) // limit), 'total': total,
                 'quota': {'used': used, 'max': config.DAILY_MAX, 'day': today()}, 'blocked_video_ids': blocked}
+
+
+def hide_history(kind, item_id=None):
+    from fastapi import HTTPException
+    table = 'posting_jobs' if kind == 'jobs' else 'activity_logs'
+    token = uuid.uuid4().hex
+    with connect() as connection:
+        connection.execute('BEGIN IMMEDIATE')
+        if kind == 'jobs' and item_id:
+            row = connection.execute('SELECT status FROM posting_jobs WHERE id=?', (item_id,)).fetchone()
+            if row and row['status'] not in {'success', 'failed', 'uncertain'}:
+                raise HTTPException(409, '진행 중인 게시 작업은 삭제할 수 없습니다.')
+        condition = " AND status IN ('success','failed','uncertain')" if kind == 'jobs' else ''
+        count = connection.execute(f'''UPDATE {table} SET hidden_by=? WHERE hidden_by IS NULL
+                AND (? IS NULL OR id=?)''' + condition, (token, item_id, item_id)).rowcount
+    return {'token': token, 'count': count}
+
+
+def restore_history(token):
+    with connect() as connection:
+        count = 0
+        for table in ('posting_jobs', 'activity_logs'):
+            count += connection.execute(f'UPDATE {table} SET hidden_by=NULL WHERE hidden_by=?', (token,)).rowcount
+    return {'count': count}

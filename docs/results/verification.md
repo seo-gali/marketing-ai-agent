@@ -18,7 +18,7 @@
 | F8 게시 제한 | API 채널 재확인·영상 중복 방지·최대 10건·동시 예약·제출 직전 날짜/상한 재검사 |
 | F9 이력 | SQLite 작업/단계 기록·초안/분석 저장·서버 재시작 후 DB 유지 확인 |
 | F10 제출 | 제작 의도 아래 작성. 실제 게시가 포함된 2~3분 시연 영상 및 공개 링크는 미제작 |
-| B1 프로필 2·3 | 선택 가점, 미구현 |
+| B1 프로필 2·3 | 환경 설정의 추가·선택·일반 Chrome 로그인 실행 및 게시 프로필 전달 구현. 임시 Chrome 프로필의 실제 폴더 분리 확인. 유튜브2·3의 실계정 로그인·실게시 미검증 |
 | B2 URL 입력 | 실제 메타데이터 조회와 서버 허용 목록 검사 구현·검증 |
 | B3 즉석 생성 | 실제 모델 기반 신규 분석·재생성 구현·검증 |
 | B4 후보 영상 탐색 | 선택 가점, 미구현 |
@@ -34,11 +34,12 @@
 | `npm.cmd run build` | TypeScript 검사 및 Vite 빌드 성공 |
 | `python -m pip install -r requirements.txt` | 지정된 4개 런타임 의존성 설치 확인 |
 | `python -m pip check` | No broken requirements found |
-| `python -m unittest discover -s tests -v` | 19검사 통과, 32.644초. 인용 조작 거절·질문 형식·OCR 경로 경계·임시 SQLite·격리된 headless Chrome 검사 |
+| `python -m unittest discover -s tests -v` | 24검사 통과, 37.443초. 게시 규칙·보안·근거·프로필 폴더 분리·삭제 후 상한/중복 차단 검사 |
 | `python scripts/verify_e2e.py` / 5173 | 초기 화면의 실제 앱·API E2E 통과 |
 | 동일 E2E / 8000 | 사용자 참조 디자인 반영 후 실제 프로덕션 번들에서 통과 |
 | `python scripts/verify_accessibility.py` | 키보드·구조·주요 대비·오류 경계·HTML 안내 문서 검사 통과 |
 | `python scripts/verify_analysis_e2e.py` | 실제 연애 영상 2건의 근거·시각·캡처·서로 다른 광고 초안·미승인 상태·모바일 검사 통과. 두 번째 영상은 실제 신규 Ollama 추론 |
+| `python scripts/verify_settings_e2e.py` | 격리된 SQLite와 실제 FastAPI에서 프로필 추가·설정 유지·이력별 페이지·삭제/복원·오류 재조회·모바일 검사 통과. 외부 게시 없음 |
 | `python scripts/backup_db.py` | SQLite Backup API 복사 및 무결성 검사 통과 |
 | `npm.cmd audit` | 알려진 취약점 0건 |
 | 개발 가상환경 `python -m pip_audit` | 알려진 취약점 0건. 최초 발견된 개발 도구 pip 취약점은 26.2.1로 수정 후 재검사 |
@@ -70,6 +71,9 @@ Playwright MCP로 초기 Windows 대시보드와 실제 한국어 YouTube 댓글
 - `artifacts/e2e-result.json`, `artifacts/e2e-production-result.json`: 화면 E2E 결과, 외부 게시 미실행 명시
 - `artifacts/live-analysis.json`: 실제 Ollama 분석 2건의 모델·시각·초안
 - `artifacts/grounded-e2e-result.json`: 연애 영상 2건의 화면 자막 인용·시각·캡처·서로 다른 초안
+- `artifacts/settings-e2e-result.json`: 격리 DB의 실제 설정·이력 API/화면 검증
+- `artifacts/settings-light.png`, `settings-dark.png`, `settings-mobile.png`: 테마·프로필 설정 화면
+- `artifacts/history-posting.png`, `history-activities.png`: 분리된 게시 작업·활동 기록
 - `artifacts/live-posting-result.json`: 승인된 1회 게시의 실제 성공 결과
 - `artifacts/live-posting-other-account.png`: 사용자가 다른 계정에서 확인한 공개 댓글
 - `artifacts/accessibility-result.json`, `artifacts/accessibility-tree.json`: 키보드·구조·대비·HTML 검사
@@ -103,6 +107,20 @@ Remove-Item Env:DOCS_URL
 ```
 
 Pages는 정적 소개 페이지입니다. FastAPI·Ollama·Chrome 게시 앱의 실행 환경은 Windows 로컬입니다.
+
+## 환경 설정·이력 정리
+
+- 사이드바 연결 상태·API 상태 링크·소형 새로고침 통합, 푸터의 중복 상태 링크·설정 화면의 연결 정보 카드 제거
+- 환경 설정: Chrome 프로필·라이트/다크 테마·작성 중인 댓글 보관의 세 영역
+- 유튜브2·3 등록과 선택 저장, 유튜브1 기존 폴더 유지. 로그인 버튼은 지정 폴더의 일반 Chrome 실행
+- 게시 작업·활동 기록별 독립 페이지 수, 데이터 로딩·오류·빈 목록 구분 및 재조회
+- 개별/전체 이력 삭제·실행 취소. SQLite 표시 제외 방식이며 실제 댓글·일일 상한·중복 차단 기록 유지
+- 키보드 프로필 선택·삭제 취소·다크 모드 전환, 모바일 메뉴의 연결 상태 접근 확인
+- 다크 모드 대비 표본: 제목 13.68:1 · 안내 8.84:1 · 선택 버튼 9.58:1
+
+설정·이력 E2E는 5173 포트의 임시 FastAPI 및 별도 SQLite에서 수행했습니다.
+검증용 게시 결과는 픽스처이며, 기존 실게시 기록의 삭제나 추가 YouTube 게시를 실행하지 않았습니다.
+유튜브2·3 실제 Google 계정은 등록하지 않았으므로 해당 계정의 로그인·실게시는 미검증입니다.
 
 ## 실제 게시 결과
 

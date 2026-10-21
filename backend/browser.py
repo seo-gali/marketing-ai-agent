@@ -2,6 +2,9 @@ import asyncio
 import re
 import unicodedata
 import uuid
+import os
+import subprocess
+from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import HTTPException
@@ -13,6 +16,7 @@ lock = asyncio.Lock()
 driver = None
 context = None
 page = None
+active_profile = '유튜브1'
 tasks = set()
 SCREENSHOTS = config.ROOT / 'local' / 'screenshots'
 
@@ -21,17 +25,23 @@ def normalize(text):
     return ' '.join(unicodedata.normalize('NFC', text).split())
 
 
-async def ensure_open():
-    global driver, context, page
-    if context and page and not page.is_closed():
+async def ensure_open(profile='유튜브1'):
+    global driver, context, page, active_profile
+    db.require_profile(profile)
+    if context and page and not page.is_closed() and active_profile == profile:
         return page
+    if context:
+        await context.close()
+    context = page = None
     if driver:
         await driver.stop()
-    config.PROFILE_PATH.mkdir(parents=True, exist_ok=True)
+    folder = config.profile_path(profile)
+    folder.mkdir(parents=True, exist_ok=True)
     driver = await async_playwright().start()
     context = await driver.chromium.launch_persistent_context(
-        config.PROFILE_PATH, channel='chrome', headless=False, locale='ko-KR',
+        folder, channel='chrome', headless=False, locale='ko-KR',
         args=['--lang=ko-KR'], viewport={'width': 1365, 'height': 900})
+    active_profile = profile
     page = context.pages[0] if context.pages else await context.new_page()
     page.set_default_timeout(15000)
     return page
@@ -175,7 +185,7 @@ async def check_access():
         raise HTTPException(409, 'YouTube 계정 로그인 또는 인증 확인을 직접 완료해 주세요.')
     await page.locator('#avatar-btn, ytd-masthead a[href*="ServiceLogin"]').first.wait_for(state='visible', timeout=20000)
     if not await page.locator('#avatar-btn').count():
-        raise HTTPException(409, '유튜브1 로그인 상태가 없습니다. 최초 로그인은 README 절차에 따라 일반 Chrome에서 직접 완료하세요.')
+        raise HTTPException(409, f'{active_profile} 로그인 상태가 없습니다. 환경 설정에서 로그인·계정 관리를 선택하세요.')
 
 
 async def status():
@@ -190,17 +200,17 @@ async def status():
             reason = error.detail
         except PlaywrightError:
             reason = '브라우저 화면 전환 중입니다. 잠시 후 확인하세요.'
-    return {'open': opened, 'signed_in': signed_in, 'needs_action': reason, 'busy': lock.locked(), 'profile': '유튜브1'}
+    return {'open': opened, 'signed_in': signed_in, 'needs_action': reason, 'busy': lock.locked(), 'profile': active_profile}
 
 
-async def open_profile(video_id=None):
+async def open_profile(video_id=None, profile='유튜브1'):
     global page
     if lock.locked():
         raise HTTPException(409, '브라우저 작업이 진행 중입니다.')
     async with lock:
         try:
-            already_open = bool(context and page and not page.is_closed())
-            await ensure_open()
+            already_open = bool(context and page and not page.is_closed() and active_profile == profile)
+            await ensure_open(profile)
             if already_open:
                 page = await context.new_page()
                 page.set_default_timeout(15000)
@@ -229,6 +239,28 @@ async def close_profile():
             await driver.stop()
         context = page = driver = None
     return {'open': False}
+
+
+async def login_profile(profile):
+    db.require_profile(profile)
+    if lock.locked():
+        raise HTTPException(409, 'Chrome 작업 완료 후 계정을 관리하세요.')
+    if context:
+        await close_profile()
+    async with lock:
+        candidates = [Path(os.environ.get(variable, '')) / 'Google/Chrome/Application/chrome.exe'
+                      for variable in ('PROGRAMFILES', 'PROGRAMFILES(X86)', 'LOCALAPPDATA')]
+        executable = next((path for path in candidates if path.is_absolute() and path.is_file()), None)
+        if not executable:
+            raise HTTPException(503, 'Google Chrome 설치 경로를 확인하세요.')
+        folder = config.profile_path(profile)
+        folder.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.Popen([str(executable), f'--user-data-dir={folder}', '--profile-directory=Default',
+                              'https://www.youtube.com/?hl=ko'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            raise HTTPException(503, '로그인용 Chrome을 열지 못했습니다.') from None
+    return {'message': f'{profile} 창에서 직접 로그인한 뒤 해당 창을 닫으세요.'}
 
 
 async def account_handle():
@@ -268,7 +300,7 @@ async def run_job(job):
         attempted = False
         try:
             db.update_job(job['id'], 'opening')
-            await ensure_open()
+            await ensure_open(job['profile'])
             db.update_job(job['id'], 'navigating')
             await page.goto(f"https://www.youtube.com/watch?v={job['video_id']}&hl=ko", wait_until='domcontentloaded')
             await page.locator('ytd-masthead').wait_for()

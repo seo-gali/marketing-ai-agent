@@ -69,7 +69,14 @@ npm.cmd run build
 
 ## 최초 로그인
 
-Google의 자동 제어 브라우저 로그인 거부 시, 지정 프로필의 일반 Chrome 직접 로그인
+환경 설정 → Chrome 프로필 → 로그인·계정 관리 → YouTube 직접 로그인 → 해당 Chrome 창 종료
+
+- 유튜브2·3: 추가 버튼으로 등록 · 계정별 독립 폴더 · 게시 프로필 선택
+- 유튜브1: 기존 지정 폴더 유지
+- 로그인 창: 자동 제어 옵션 없는 일반 Chrome · 기본 Chrome 프로필과 분리
+- 유튜브2·3의 실제 Google 계정 로그인·게시: 사용자 계정 미등록으로 미검증
+
+유튜브1 최초 로그인의 터미널 실행 방법
 
 ```powershell
 $loginProfilePath=(./.venv/Scripts/python.exe -c "from backend.config import PROFILE_PATH; print(PROFILE_PATH)").Trim()
@@ -94,9 +101,13 @@ $loginProfilePath=(./.venv/Scripts/python.exe -c "from backend.config import PRO
 - 빈 검색어: 목록 0건·입력 안내, API 422 · 전체 목록 버튼 별도
 - 댓글 오류: blur·저장 시 검증 · 오류 필드 포커스
 - 임시 저장: 영상별 localStorage · 7일 만료 · 앱 시작/영상 선택 시 만료본 삭제
+- 환경 설정: 라이트·다크 테마 · 브라우저별 테마·게시 프로필 선택 유지
+- 연결 상태: 사이드바의 Ollama·YouTube 상태 · 작은 새로고침 버튼 · API 상태 링크
 - 검색·필터: 브라우저 저장 · 초기화·실행 취소
 - 모바일: 메뉴 열기/닫기 · 단일 열 · 키보드 포커스
-- 이력: 상태·오류·캡처 · 번호 페이지 이동
+- 이력: 게시 작업·활동 기록별 독립 페이지 · 개별/전체 삭제 · 실행 취소 · 연결 오류 재조회
+- 이력 삭제: 표시 이력 제거 · 게시 댓글·중복 방지·일일 상한 유지
+- 임시 초안 삭제: 이 브라우저의 작성 중 댓글만 삭제 · 서버 저장 초안·테마·검색 상태 유지
 - 사용자용 404 · 클릭 가능한 로고 · 파비콘·메타 설명
 
 ## 게시 규칙
@@ -119,13 +130,14 @@ $loginProfilePath=(./.venv/Scripts/python.exe -c "from backend.config import PRO
 ./.venv/Scripts/python.exe scripts/verify_e2e.py
 ./.venv/Scripts/python.exe scripts/verify_accessibility.py
 ./.venv/Scripts/python.exe scripts/verify_analysis_e2e.py
+./.venv/Scripts/python.exe scripts/verify_settings_e2e.py
 ./.venv/Scripts/python.exe scripts/verify_docs.py
 npm.cmd run build
 npm.cmd audit
 ./.venv/Scripts/python.exe -m pip check
 ```
 
-- Python 검사: 19건 통과 · 게시 규칙·동시성·날짜 변경·인용 위조 차단·격리 브라우저·보안 경계
+- Python 검사: 24건 통과 · 게시 규칙·동시성·인용 위조 차단·보안 경계·프로필 분리·삭제 후 게시 제한
 - 화면 E2E: 실제 5채널 40영상 · 편집/임시 저장 · 빈 검색어 · 승인 초기화 · 차단 응답 · 반응형
 - 접근성: 키보드 메뉴·본문 이동·포커스·접근성 트리·레이블·주요 텍스트 대비
 - 소개 페이지: 탭·실제 Markdown 문서 4개·팝업 포커스·모바일·오류 복구·HTML 실행 차단
@@ -133,6 +145,7 @@ npm.cmd audit
 - 의존성 검사: 알려진 취약점 0건 · 별도 개발 도구 `pip-audit` 검사 포함
 - 검사 한계: NVDA/JAWS 실기기·공개 배포 침투·대규모 부하 미검증
 - 자동 검증의 외부 댓글 게시: 미실행
+- 설정·이력 E2E: 격리된 SQLite·검증용 5173 포트의 실제 FastAPI · 실제 계정/게시 기록 변경 없음
 - 실계정 별도 검증: 승인 본문 1회 게시·새로고침 확인·사용자의 다른 계정 공개 확인
 
 ## 로컬 데이터·백업
@@ -166,7 +179,8 @@ Git 제외: `.env`·API 키·Chrome 인증정보·DB·캡처·로컬 백업·과
 
 - 2~3분 실제 게시 시연 영상
 - 자막·OCR 인용과 실제 화면의 사용자 대조 · 전체 영상 장면 분석 제외
-- 가점: 프로필 2·3 선택/배정 · 뜨기 직전 영상 탐색
+- 프로필 2·3의 실계정 로그인·실게시 검증
+- 가점: 뜨기 직전 영상 탐색
 - 모델의 의미적 사실성에 대한 사용자 검토
 - 인터넷 공개 전 별도 인증·권한 설계
 

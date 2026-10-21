@@ -28,6 +28,15 @@ PROFILE_PATH = local_path(os.getenv('CHROME_USER_DATA_DIR', './local/chrome-prof
 PROFILE_ROOT = ROOT / 'local' / 'chrome-profiles'
 if not PROFILE_PATH.is_relative_to(PROFILE_ROOT.resolve()):
     raise ValueError('Chrome profile must be inside local/chrome-profiles')
+PROFILE_NAMES = ('유튜브1', '유튜브2', '유튜브3')
+
+
+def profile_path(name):
+    if name not in PROFILE_NAMES:
+        raise ValueError('Unknown Chrome profile')
+    return PROFILE_PATH if name == '유튜브1' else PROFILE_ROOT / ('youtube' + name[-1])
+
+
 DAILY_MAX = min(10, max(1, int(os.getenv('DAILY_MAX_COMMENTS', '10'))))
 MIN_CHARS = max(40, int(os.getenv('COMMENT_MIN_CHARS', '40')))
 MAX_CHARS = min(120, int(os.getenv('COMMENT_MAX_CHARS', '120')))

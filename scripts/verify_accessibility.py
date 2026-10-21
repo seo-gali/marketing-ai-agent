@@ -72,6 +72,24 @@ async def main():
             result['contrast_samples']=contrasts
             assert await page.locator('.soft-count').evaluate("element=>getComputedStyle(element).animationName")=='none'
             result['checks'].append('sample_text_contrast_and_reduced_motion')
+            themed=await chromium.new_page(viewport={'width':1440,'height':1000})
+            await themed.goto(BASE+'/settings')
+            await themed.get_by_role('button',name='다크',exact=True).focus()
+            await themed.keyboard.press('Enter')
+            await expect(themed.locator('html')).to_have_attribute('data-theme','dark')
+            dark_contrasts={}
+            background=await themed.locator('.app-shell').evaluate('element=>getComputedStyle(element).backgroundColor')
+            for selector in ['h1','.setting-card p','.theme-options button[aria-pressed=true]']:
+                color=await themed.locator(selector).first.evaluate('element=>getComputedStyle(element).color')
+                first=luminance(color);second=luminance(background)
+                ratio=(max(first,second)+.05)/(min(first,second)+.05)
+                assert ratio>=4.5,(selector,ratio)
+                dark_contrasts[selector]=round(ratio,2)
+            await themed.set_viewport_size({'width':390,'height':1000})
+            assert await themed.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            await themed.close()
+            result['dark_contrast_samples']=dark_contrasts
+            result['checks'].append('dark_theme_keyboard_contrast_and_mobile_overflow')
             await page.set_viewport_size({'width':1440,'height':1000})
             for selector in ['.avatar','.detail-icon','.search-submit','.top-search']:
                 delta=await page.locator(selector).evaluate('element=>{const a=element.getBoundingClientRect(),b=element.querySelector("svg").getBoundingClientRect();return {x:Math.abs(a.x+a.width/2-b.x-b.width/2),y:Math.abs(a.y+a.height/2-b.y-b.height/2)}}')
@@ -83,14 +101,14 @@ async def main():
             # 번호 이동 검사 전용 이력, 실제 DB에 기록하지 않음
             async def history_fixture(route):
                 offset=int(parse_qs(urlparse(route.request.url).query).get('offset',['0'])[0])
-                await route.fulfill(json={'jobs':[],'logs':[{'id':offset+1,'video_id':'fixture','stage':'draft_saved','detail':f'page-{offset//30+1}','created_at':'2026-10-21T00:00:00+09:00'}],'quota':{'used':0,'max':10,'day':'2026-10-21'},'blocked_video_ids':[],'has_more':offset<60,'total_pages':3})
+                await route.fulfill(json={'jobs':[],'logs':[{'id':offset+1,'video_id':'fixture','stage':'draft_saved','detail':f'page-{offset//30+1}','created_at':'2026-10-21T00:00:00+09:00'}],'quota':{'used':0,'max':10,'day':'2026-10-21'},'blocked_video_ids':[],'has_more':offset<60,'total_pages':3,'total':90})
             numbered=await chromium.new_page(viewport={'width':390,'height':900})
             await numbered.route(BASE+'/api/activities*',history_fixture)
             await numbered.goto(BASE+'/activities')
+            await numbered.get_by_role('button',name='활동 기록',exact=True).click()
             third=numbered.get_by_role('button',name='3페이지',exact=True)
             await third.click()
             await expect(third).to_have_attribute('aria-current','page')
-            await numbered.get_by_text('더보기 · 단계별 활동 기록',exact=True).click()
             await expect(numbered.get_by_text('page-3',exact=True)).to_be_visible()
             await numbered.get_by_role('button',name='1페이지',exact=True).click()
             await expect(numbered.get_by_text('page-1',exact=True)).to_be_visible()

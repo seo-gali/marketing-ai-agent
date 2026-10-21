@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import re
 import unicodedata
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -93,8 +94,46 @@ def update_draft(video_id: str, body: DraftRequest):
 
 
 @app.get('/api/activities')
-def get_activities(offset: int = Query(default=0, ge=0, le=100000), limit: int = Query(default=30, ge=1, le=100)):
-    return db.activities(offset, limit)
+def get_activities(offset: int = Query(default=0, ge=0, le=100000), limit: int = Query(default=30, ge=1, le=100), kind: Literal['jobs', 'logs'] = 'jobs'):
+    return db.activities(offset, limit, kind)
+
+
+class HistoryDeletion(BaseModel):
+    kind: Literal['jobs', 'logs']
+    id: str | None = Field(default=None, pattern=r'^(?:[a-f0-9]{32}|[0-9]{1,20})$')
+
+
+@app.delete('/api/activities')
+def delete_history(body: HistoryDeletion):
+    return db.hide_history(body.kind, body.id)
+
+
+class HistoryRestore(BaseModel):
+    token: str = Field(pattern=r'^[a-f0-9]{32}$')
+
+
+@app.post('/api/activities/restore')
+def restore_history(body: HistoryRestore):
+    return db.restore_history(body.token)
+
+
+class ProfileRequest(BaseModel):
+    name: Literal['유튜브1', '유튜브2', '유튜브3']
+
+
+@app.get('/api/profiles')
+def get_profiles():
+    return db.profiles()
+
+
+@app.post('/api/profiles')
+def add_profile(body: ProfileRequest):
+    return db.add_profile(body.name)
+
+
+@app.post('/api/profiles/login')
+async def login_profile(body: ProfileRequest):
+    return await browser.login_profile(body.name)
 
 
 @app.get('/api/posting-jobs/{job_id}')
@@ -107,12 +146,13 @@ def get_posting_job(job_id: str):
 
 class BrowserRequest(BaseModel):
     video_id: str | None = None
+    profile: Literal['유튜브1', '유튜브2', '유튜브3'] = '유튜브1'
 
 
 @app.post('/api/browser/open')
 async def open_browser(body: BrowserRequest):
     video_id = services.video_id(body.video_id) if body.video_id else None
-    return await browser.open_profile(video_id)
+    return await browser.open_profile(video_id, body.profile)
 
 
 @app.post('/api/browser/close')
