@@ -24,6 +24,16 @@ summary{cursor:pointer;font-size:12px;color:#435d7c;padding:8px 0}
 .channel-chips .add-channel-tab{display:inline-flex;align-items:center;gap:5px;border-style:dashed}
 .add-channel-panel{padding:18px;margin-top:12px;border:1px solid var(--line);border-radius:11px;background:var(--canvas)}
 .add-channel-panel h2{margin:0 0 15px;color:var(--text);font-size:13px}
+.video-list{max-height:60vh;overflow-y:auto;scrollbar-gutter:stable}
+.video-list .video-item.selected:before{left:0}
+.video-list .video-item:focus-visible{outline-offset:-3px!important}
+@media(min-width:1151px){
+  .main-panel{display:flex;flex-direction:column;overflow:hidden}
+  .main-panel>:not(#channel-content){flex-shrink:0}
+  #channel-content{display:flex;flex-direction:column;flex:1;min-height:0}
+  #channel-content>:not(.video-list){flex-shrink:0}
+  .video-list{flex:1;min-height:0;max-height:none;overscroll-behavior:contain}
+}
 .channel-chips{flex-wrap:wrap;overflow:visible;gap:6px}.channel-chips button{font-size:11px;padding:7px 9px}
 .filter-actions{display:flex;align-items:center;gap:12px;margin:9px 0;flex-wrap:wrap}
 .source-link{display:flex;align-items:center;gap:6px;font-size:11px;margin:0 0 15px}

@@ -33,6 +33,18 @@ async def main():
             channels = {text.split(' · ')[0] for text in await page.locator('.video-info > span').all_text_contents()}
             assert len(channels) == 5, channels
             result['checks'].append({'live_youtube_list': videos, 'channels': len(channels)})
+            search_top=await page.locator('.search-form').evaluate('element=>element.getBoundingClientRect().top')
+            listing=page.get_by_role('region',name='영상 목록',exact=True)
+            await listing.focus()
+            await page.keyboard.press('PageDown')
+            async with asyncio.timeout(5):
+                while await listing.evaluate('element=>element.scrollTop')==0:
+                    await asyncio.sleep(.05)
+            assert await page.locator('.main-panel').evaluate('element=>element.scrollTop===0&&element.scrollHeight<=element.clientHeight+1')
+            assert await page.locator('.search-form').evaluate('element=>element.getBoundingClientRect().top')==search_top
+            await page.screenshot(path=ARTIFACTS/'video-list-scroll.png',full_page=True)
+            await listing.evaluate('element=>element.scrollTop=0')
+            result['checks'].append({'video_list_keyboard_scroll_with_fixed_controls':'passed'})
             await page.get_by_role('button', name='외롭여', exact=True).click()
             filtered = await page.locator('.video-item').count()
             assert 0 < filtered < videos
