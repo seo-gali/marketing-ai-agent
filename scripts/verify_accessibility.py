@@ -98,6 +98,14 @@ async def main():
                     assert delta['x']<.5,(selector,delta)
             assert await page.locator('.app-footer>a').get_attribute('href')=='https://github.com/seo-gali/marketing-ai-agent'
             result['checks'].append('icon_centers_and_repository_footer')
+            await page.get_by_role('button',name='채널 추가',exact=True).focus()
+            await page.keyboard.press('Enter')
+            await expect(page.locator('#video-url')).to_be_visible()
+            await page.keyboard.press('Tab')
+            await expect(page.locator('#video-url')).to_be_focused()
+            await page.get_by_role('button',name='전체 채널',exact=True).click()
+            assert await page.locator('#video-url').count()==0
+            result['checks'].append('channel_add_keyboard_flow_and_scoped_url_form')
             # 번호 이동 검사 전용 이력, 실제 DB에 기록하지 않음
             async def history_fixture(route):
                 offset=int(parse_qs(urlparse(route.request.url).query).get('offset',['0'])[0])

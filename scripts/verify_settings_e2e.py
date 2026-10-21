@@ -64,10 +64,22 @@ async def verify():
                     await page.goto(BASE + '/settings')
                     await expect(page.get_by_role('heading', name='환경 설정', exact=True)).to_be_visible()
                     assert await page.locator('.app-footer a[href="/api/health"]').count() == 0
-                    await expect(page.locator('.connection-box').get_by_role('link', name='API 상태')).to_be_visible()
+                    assert await page.locator('a[href="/api/health"]').count() == 0
+                    await expect(page.get_by_role('button', name='API 상태 확인', exact=True)).to_be_visible()
                     async with page.expect_response('**/api/health') as refreshed:
-                        await page.get_by_role('button', name='연결 상태 새로고침', exact=True).click()
-                    assert (await refreshed.value).ok
+                        await page.get_by_role('button', name='API 상태 확인', exact=True).click()
+                    assert (await refreshed.value).status == 200
+                    await expect(page.locator('.api-connection .status-dot')).to_have_class('status-dot on')
+                    await expect(page.locator('.api-connection')).to_contain_text('API 연결됨')
+                    await page.route('**/api/health', lambda route: route.fulfill(status=503, json={'detail':'검증용 오류'}))
+                    await page.get_by_role('button', name='API 상태 확인', exact=True).click()
+                    await expect(page.locator('.api-connection .status-dot')).to_have_class('status-dot off')
+                    await expect(page.locator('.api-connection')).to_contain_text('API 연결 실패')
+                    await page.unroute('**/api/health')
+                    await page.get_by_role('button', name='API 상태 확인', exact=True).click()
+                    await expect(page.locator('.api-connection .status-dot')).to_have_class('status-dot on')
+                    assert len(chrome.contexts[0].pages) == 1
+                    result['checks'].append('api_check_200_green_503_red_retry_without_new_tab')
                     for name in ['유튜브2', '유튜브3']:
                         await page.get_by_role('button', name=name + ' 추가', exact=True).click()
                         await expect(page.get_by_role('radio', name=name, exact=False)).to_be_visible()
@@ -137,6 +149,7 @@ async def verify():
                             await page.goto(BASE + route)
                             await page.get_by_role('heading', level=1).wait_for()
                             assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                            assert await page.locator('.app-footer').evaluate('element=>{const link=element.querySelector("a");return Math.abs(element.getBoundingClientRect().right-parseFloat(getComputedStyle(element).paddingRight)-link.getBoundingClientRect().right)<1}')
                     await page.get_by_role('button', name='메뉴 열기', exact=True).click()
                     await expect(page.get_by_role('button', name='연결 상태 새로고침', exact=True)).to_be_visible()
                     await page.screenshot(path=ARTIFACTS / 'settings-mobile.png', full_page=True)

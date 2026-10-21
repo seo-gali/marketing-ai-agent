@@ -30,11 +30,14 @@ export default function App() {
   const [menuOpen,setMenuOpen]=useState(false)
   const [health,setHealth]=useState<Health>()
   const [healthLoading,setHealthLoading]=useState(false)
+  const [apiConnected,setApiConnected]=useState<boolean|null>(null)
   const [theme,setTheme]=useState(readTheme)
   const [profiles,setProfiles]=useState<string[]>(['유튜브1'])
   const [profile,setProfile]=useState(readProfile)
   const [addingProfile,setAddingProfile]=useState('')
   const [videos,setVideos]=useState<Video[]>([])
+  const [linkedVideos,setLinkedVideos]=useState<Video[]>([])
+  const [channelAddOpen,setChannelAddOpen]=useState(false)
   const [selected,setSelected]=useState<Video>()
   const [filters]=useState(readFilters)
   const [search,setSearch]=useState(filters.search)
@@ -73,7 +76,7 @@ export default function App() {
   const pending=activities?.jobs.some(item=>!terminal.includes(item.status))??false
   const blocked=(!!selected&&!!activities?.blocked_video_ids.includes(selected.id))||(!!job&&job.status!=='failed')
   const invalid=validate(draft,health?.min_chars,health?.max_chars)
-  const visible=videos.filter(video=>(!channel||video.channel_id===channel)&&(!searchActive||(!!search.trim()&&`${video.title} ${video.channel}`.toLowerCase().includes(search.trim().toLowerCase()))))
+  const visible=channelAddOpen?linkedVideos:videos.filter(video=>(!channel||video.channel_id===channel)&&(!searchActive||(!!search.trim()&&`${video.title} ${video.channel}`.toLowerCase().includes(search.trim().toLowerCase()))))
   const canPost=!!selected?.allowed&&!!analysis&&approved&&!invalid&&!analyzing&&!posting&&!pending&&!blocked&&!!activities&&activities.quota.used<activities.quota.max
   const historyPageCount=history?.total_pages??1
   const firstHistoryPage=Math.max(0,Math.min(historyPage-2,historyPageCount-5))
@@ -93,8 +96,13 @@ export default function App() {
   }
   function success(message:string) {setNotice(message);setError('');setUndo(null);setHistoryUndo(null)}
   async function refreshHealth() {
-    setHealthLoading(true)
-    try {setHealth(await api<Health>('/health'))} catch(problem) {setHealth(undefined);fail(problem)} finally {setHealthLoading(false)}
+    setHealthLoading(true);setError('')
+    try {
+      const response=await fetch('/api/health')
+      if(response.status!==200) throw new Error(`API 연결 확인 실패 (HTTP ${response.status}). 다시 확인하세요.`)
+      const data:Health=await response.json().catch(()=>{throw new Error('API 응답을 읽을 수 없습니다.')})
+      setHealth(data);setApiConnected(true)
+    } catch(problem) {setHealth(undefined);setApiConnected(false);fail(problem)} finally {setHealthLoading(false)}
   }
   useEffect(()=>{
     document.documentElement.dataset.theme=theme
@@ -157,7 +165,7 @@ export default function App() {
 
   function resetFilters() {const previous={search,channel,active:searchActive};setSearch('');setChannel('');setSearchActive(false);success('검색과 필터를 초기화했습니다.');setUndo(previous)}
   async function load() {
-    setLoading(true);setError('')
+    setLoading(true);setError('');setChannelAddOpen(false)
     try {const data=await api<{videos:Video[];warnings:string[]}>('/videos');setVideos(data.videos);success(data.warnings.length?data.warnings.join(' / '):`${data.videos.length}개 영상을 불러왔습니다.`)}
     catch(problem) {fail(problem)} finally {setLoading(false)}
   }
@@ -180,7 +188,7 @@ export default function App() {
   async function resolve() {
     if(!url.trim()) {fail(new Error('영상 URL을 입력하세요.'),'video-url');return}
     setLoading(true);setError('')
-    try {const video=await api<Video>('/videos/resolve','POST',{url:url.trim()});setVideos(items=>[video,...items.filter(item=>item.id!==video.id)]);setChannel('');setSearchActive(false);setUrl('');success('영상 링크를 확인했습니다.');void select(video)}
+    try {const video=await api<Video>('/videos/resolve','POST',{url:url.trim()});setLinkedVideos(items=>[video,...items.filter(item=>item.id!==video.id)]);setUrl('');success('영상 링크를 확인했습니다.');void select(video)}
     catch(problem) {fail(problem,'video-url')} finally {setLoading(false)}
   }
   async function regenerate() {
@@ -250,14 +258,34 @@ export default function App() {
           <div className="connection-toolbar"><strong>연결 상태</strong><button className="icon-button" aria-label="연결 상태 새로고침" title="연결 상태 새로고침" disabled={healthLoading} onClick={()=>void refreshHealth()}><Icon name="refresh" size={15}/></button></div>
           <div className="connection-head"><span className={`status-dot ${health?.ollama==='ready'?'on':''}`}/>Ollama {healthLoading?'확인 중':health?.ollama==='ready'?'연결됨':'확인 필요'}</div><p>{health?.model??'연결 확인 중'}</p>
           <div className="connection-head"><span className={`status-dot ${health?.youtube==='configured'?'on':''}`}/>YouTube API {healthLoading?'확인 중':health?.youtube==='configured'?'키 설정됨':'확인 필요'}</div>
-          <a className="connection-api" href="/api/health" target="_blank" rel="noreferrer">API 상태 <Icon name="external" size={12}/></a>
+          <div className="connection-head api-connection"><span className={`status-dot ${healthLoading?'':apiConnected===true?'on':apiConnected===false?'off':''}`}/><span role="status">API {healthLoading?'확인 중':apiConnected===true?'연결됨':apiConnected===false?'연결 실패':'미확인'}</span><button className="connection-check" aria-label="API 상태 확인" disabled={healthLoading} onClick={()=>void refreshHealth()}>확인</button></div>
         </section>
         <div className="user-chip"><span className="avatar"><Icon name="user"/></span><span><strong>Local Operator</strong><span>광고 콘텐츠 · 승인 후 게시</span></span></div>
       </div>
     </aside>
-    {path==='/'&&<><main id="main-content" className="main-panel" tabIndex={-1} aria-labelledby="page-title"><header className="heading"><div className="eyebrow">CONTENT DISCOVERY</div><h1 id="page-title">영상 탐색 <span key={videos.length} className="soft-count">{videos.length}</span></h1><p>영상을 불러오고, 분석할 대상을 선택하세요.</p></header><form className="search-form" onSubmit={event=>{event.preventDefault();setSearchActive(true);if(!search.trim()) fail(new Error('검색어를 입력하세요.'),'video-search')}}><label className="field-label" htmlFor="video-search">영상 검색</label><div className="top-search"><Icon name="search"/><input id="video-search" type="search" maxLength={100} value={search} onChange={event=>{setSearch(event.target.value);setSearchActive(true)}}/><button className="search-submit" aria-label="검색 실행"><Icon name="chevron"/></button></div></form>{searchActive&&!search.trim()&&<p className="field-error">검색어를 입력하세요. 빈 검색어로 전체 목록을 조회하지 않습니다.</p>}
-      <section className="section-spacing" aria-label="영상 수집"><div className="section-title"><strong>01 · 영상 불러오기</strong><span>지정 채널 5개</span></div><button className="btn primary full-load" disabled={loading} onClick={load}><Icon name="refresh" size={16}/>{loading?'불러오는 중…':'① 영상 불러오기'}</button><details className="more-tools"><summary>더보기 · 영상 URL로 선택</summary><form onSubmit={event=>{event.preventDefault();void resolve()}}><label className="field-label" htmlFor="video-url">YouTube 영상 링크</label><div className="url-control"><input id="video-url" type="url" inputMode="url" maxLength={2048} value={url} onChange={event=>setUrl(event.target.value)} aria-describedby="url-help"/><button aria-label="링크 확인" title="링크 확인" disabled={loading||analyzing}><Icon name="link"/></button></div><p id="url-help" className="help-text">YouTube 영상 주소를 입력하세요. 실제 채널을 확인합니다.</p></form></details></section>
-      <div className="section-title videos-heading"><strong>채널별 영상 목록</strong><span role="status">{loading?'조회 중':`${visible.length}개 표시`}</span></div><div className="channel-chips" role="group" aria-label="채널 필터"><button aria-pressed={!channel} className={!channel?'selected':''} onClick={()=>setChannel('')}>전체 채널</button>{Object.entries(health?.channels??{}).map(([id,name])=><button key={id} aria-pressed={channel===id} className={channel===id?'selected':''} onClick={()=>setChannel(id)}>{name}</button>)}</div>{(searchActive||channel)&&<div className="filter-actions"><button className="btn light" onClick={resetFilters}>전체 목록 보기</button><span className="help-text">검색·필터 상태가 이 브라우저에 저장됩니다.</span></div>}<div className="video-list" id="video-list" aria-busy={loading}>{visible.map(video=><button className={`video-item ${selected?.id===video.id?'selected':''}`} key={video.id} aria-pressed={selected?.id===video.id} disabled={analyzing} onClick={()=>void select(video)}><span className="thumbnail"><img src={video.thumbnail} alt="" loading="lazy" decoding="async" width="120" height="90"/></span><span className="video-info"><strong>{video.title}</strong><span>{video.channel} · {new Date(video.published_at).toLocaleDateString('ko-KR')}</span><small>{video.allowed?'게시 허용 범위':'분석만 가능'}</small></span><span className="video-arrow"><Icon name={selected?.id===video.id?'check':'chevron'}/></span></button>)}{!loading&&!visible.length&&<div className="empty-state"><span className="empty-icon"><Icon name="video" size={23}/></span><strong>{videos.length?'조건에 맞는 영상이 없습니다.':'아직 불러온 영상이 없습니다.'}</strong><p>{videos.length?'검색어를 입력하거나 전체 목록 보기를 선택하세요.':'영상 불러오기를 눌러 목록을 확인하세요.'}</p>{!videos.length&&<button className="btn secondary" onClick={load}>영상 불러오기</button>}</div>}</div><p className="bottom-footnote">수집한 자막과 화면의 출처를 확인하세요. 근거를 얻지 못한 영상은 메타데이터 분석으로 표시합니다.</p></main>
+    {path==='/'&&<><main id="main-content" className="main-panel" tabIndex={-1} aria-labelledby="page-title"><header className="heading"><div className="eyebrow">CONTENT DISCOVERY</div><h1 id="page-title">영상 탐색 <span key={videos.length} className="soft-count">{videos.length}</span></h1><p>영상을 불러오고, 분석할 대상을 선택하세요.</p></header>{!channelAddOpen&&<form className="search-form" onSubmit={event=>{event.preventDefault();setSearchActive(true);if(!search.trim()) fail(new Error('검색어를 입력하세요.'),'video-search')}}><label className="field-label" htmlFor="video-search">영상 검색</label><div className="top-search"><Icon name="search"/><input id="video-search" type="search" maxLength={100} value={search} onChange={event=>{setSearch(event.target.value);setSearchActive(true)}}/><button className="search-submit" aria-label="검색 실행"><Icon name="chevron"/></button></div></form>}{!channelAddOpen&&searchActive&&!search.trim()&&<p className="field-error">검색어를 입력하세요. 빈 검색어로 전체 목록을 조회하지 않습니다.</p>}
+      <section className="section-spacing" aria-label="영상 수집">
+        <div className="section-title"><strong>01 · 영상 불러오기</strong><span>지정 채널 5개</span></div>
+        <button className="btn primary full-load" disabled={loading} onClick={load}><Icon name="refresh" size={16}/>{loading?'불러오는 중…':'① 영상 불러오기'}</button>
+      </section>
+      <div className="section-title videos-heading"><strong>채널별 영상 목록</strong><span role="status">{loading?'조회 중':`${visible.length}개 표시`}</span></div>
+      <div className="channel-chips" role="group" aria-label="채널 필터">
+        <button aria-pressed={!channelAddOpen&&!channel} className={!channelAddOpen&&!channel?'selected':''} onClick={()=>{setChannelAddOpen(false);setChannel('')}}>전체 채널</button>
+        {Object.entries(health?.channels??{}).map(([id,name])=><button key={id} aria-pressed={!channelAddOpen&&channel===id} className={!channelAddOpen&&channel===id?'selected':''} onClick={()=>{setChannelAddOpen(false);setChannel(id)}}>{name}</button>)}
+        <button className={`add-channel-tab ${channelAddOpen?'selected':''}`} aria-pressed={channelAddOpen} aria-controls="channel-content" onClick={()=>setChannelAddOpen(true)}><Icon name="plus" size={13}/>채널 추가</button>
+      </div>
+      <div id="channel-content">
+        {channelAddOpen?<section className="add-channel-panel" aria-labelledby="add-channel-title">
+          <h2 id="add-channel-title">채널 추가</h2>
+          <form onSubmit={event=>{event.preventDefault();void resolve()}}><label className="field-label" htmlFor="video-url">YouTube 영상 링크</label><div className="url-control"><input id="video-url" type="url" inputMode="url" maxLength={2048} value={url} onChange={event=>setUrl(event.target.value)} aria-describedby="url-help"/><button aria-label="링크 확인" title="링크 확인" disabled={loading||analyzing}><Icon name="link"/></button></div><p id="url-help" className="help-text">영상 링크로 채널과 영상을 확인합니다. 조회한 영상은 이 탭에 표시됩니다.</p></form>
+        </section>:(searchActive||channel)&&<div className="filter-actions"><button className="btn light" onClick={resetFilters}>전체 목록 보기</button><span className="help-text">검색·필터 상태가 이 브라우저에 저장됩니다.</span></div>}
+        <div className="video-list" id="video-list" aria-busy={loading}>
+          {visible.map(video=><button className={`video-item ${selected?.id===video.id?'selected':''}`} key={video.id} aria-pressed={selected?.id===video.id} disabled={analyzing} onClick={()=>void select(video)}><span className="thumbnail"><img src={video.thumbnail} alt="" loading="lazy" decoding="async" width="120" height="90"/></span><span className="video-info"><strong>{video.title}</strong><span>{video.channel} · {new Date(video.published_at).toLocaleDateString('ko-KR')}</span><small>{video.allowed?'게시 허용 범위':'분석만 가능'}</small></span><span className="video-arrow"><Icon name={selected?.id===video.id?'check':'chevron'}/></span></button>)}
+          {!loading&&!visible.length&&<div className="empty-state"><span className="empty-icon"><Icon name="video" size={23}/></span><strong>{channelAddOpen?'조회한 영상이 없습니다.':videos.length?'조건에 맞는 영상이 없습니다.':'아직 불러온 영상이 없습니다.'}</strong><p>{channelAddOpen?'위에 YouTube 영상 링크를 입력하세요.':videos.length?'검색어를 입력하거나 전체 목록 보기를 선택하세요.':'영상 불러오기를 눌러 목록을 확인하세요.'}</p>{!channelAddOpen&&!videos.length&&<button className="btn secondary" onClick={load}>영상 불러오기</button>}</div>}
+        </div>
+      </div>
+      <p className="bottom-footnote">수집한 자막과 화면의 출처를 확인하세요. 근거를 얻지 못한 영상은 메타데이터 분석으로 표시합니다.</p>
+    </main>
       <aside className="detail-panel" aria-label="AI 분석 및 댓글 상세"><div className="detail-header"><div className="detail-header-left"><span className="detail-icon"><Icon name="sparkle"/></span><div><strong>AI 콘텐츠 분석</strong><span>OLLAMA LOCAL AGENT</span></div></div><span className="badge neutral">로컬 실행</span></div><div className="detail-scroll">{!selected?<div className="selection-empty"><div className="empty-orb"><Icon name="video" size={30}/></div><h2>분석할 영상을 선택하세요</h2><p>영상 목록에서 하나를 선택하면 고민 요약과 댓글 초안이 표시됩니다.</p></div>:<>
         <section className="detail-section"><div className="section-title"><strong>02 · 영상 선택 및 AI 분석</strong><span className="badge neutral">{selected.channel}</span></div><h2 id="analysis-title" className="selected-title" tabIndex={-1}>{selected.title}</h2><div className="mini-meta"><Icon name="clock" size={13}/>{date(selected.published_at)}</div><a className="source-link" href={`https://www.youtube.com/watch?v=${selected.id}`} target="_blank" rel="noreferrer">YouTube에서 영상 보기 <Icon name="external" size={13}/></a><button className="btn secondary full" disabled={analyzing||pending} onClick={regenerate}><Icon name="sparkle" size={15}/>{analyzing?'Ollama 분석 중…':analysis?'초안 다시 생성':'영상 분석'}</button>{analyzing&&<p role="status" className="help-text">실제 자료를 수집하고 있습니다. 완료까지 잠시 기다려 주세요.</p>}</section>
         {analysis&&<section className="detail-section"><div className="section-title"><h3>영상의 핵심 고민</h3><span className="badge blue">{analysis.scene_verified?(analysis.source_basis==='frame_ocr'?'화면 근거 확인':'자막 근거 확인'):'메타데이터 분석'}</span></div><p className="concern-box">{analysis.concern}</p><div className="evidence-box"><div className="evidence-title"><Icon name="shield" size={14}/>분석 근거</div>{analysis.evidence.map((item,index)=><div key={index}><a href={item.url} target="_blank" rel="noreferrer">{item.label} ↗</a><p>{item.quote}</p>{item.capture&&<a href={`/api/screenshots/${encodeURIComponent(item.capture)}`} target="_blank" rel="noreferrer">영상 화면 캡처 ↗</a>}</div>)}{analysis.warnings.map(warning=><p className="limitation" key={warning}><Icon name="alert" size={13}/>{warning}</p>)}</div><details><summary>더보기 · 영상 설명과 분석 정보</summary><p className="video-description">{selected.description}</p><p className="help-text">{analysis.model} · {date(analysis.created_at)}</p></details></section>}

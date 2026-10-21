@@ -50,7 +50,7 @@ async def main():
             assert await page.locator('.video-item').count()==0
             await page.get_by_role('button',name='전체 목록 보기',exact=True).click()
             result['checks'].append({'filter_and_empty_search': 'passed', 'empty_query_api':422})
-            await page.get_by_text('더보기 · 영상 URL로 선택',exact=True).click()
+            await page.get_by_role('button',name='채널 추가',exact=True).click()
             await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/akn-AvCeHBI')
             await page.get_by_role('button', name='링크 확인').click()
             await expect(page.locator('#draft')).not_to_have_value('',timeout=240000)
@@ -58,6 +58,14 @@ async def main():
             draft = await page.locator('#draft').input_value()
             assert 40 <= len(draft) <= 120 and draft.startswith('[광고]') and '운명원' in draft
             await expect(page.locator('#analysis-title')).to_have_text('남자의 연애 작동원리')
+            await expect(page.locator('.video-item')).to_have_count(1)
+            await page.get_by_role('button', name='전체 채널', exact=True).click()
+            await expect(page.locator('.video-item')).to_have_count(videos)
+            assert await page.locator('#video-url').count() == 0
+            await page.get_by_role('button', name='채널 추가', exact=True).click()
+            await expect(page.locator('#video-url')).to_be_visible()
+            await expect(page.locator('.video-item')).to_have_count(1)
+            result['checks'].append({'url_tab_and_results_isolated_from_channel_list':'passed'})
             button = page.get_by_role('button', name='③ 댓글 달기', exact=True)
             assert await button.is_disabled()
             approval = page.get_by_role('checkbox', name='현재 본문을 확인했으며 광고 댓글 게시를 승인합니다.')
@@ -78,7 +86,7 @@ async def main():
             await expect(page.get_by_text('이 브라우저에 임시 저장됨 · 7일 보관',exact=True)).to_be_visible()
             assert await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:akn-AvCeHBI')).text")==edited
             await page.reload()
-            await page.get_by_text('더보기 · 영상 URL로 선택',exact=True).click()
+            await page.get_by_role('button',name='채널 추가',exact=True).click()
             await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/akn-AvCeHBI')
             await page.get_by_role('button',name='링크 확인',exact=True).click()
             await expect(page.locator('#draft')).to_have_value(edited)

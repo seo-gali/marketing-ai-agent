@@ -21,7 +21,7 @@ async def main():
         page.on('response', lambda response: analysis_responses.update({response.url.split('/')[-2]: response}) if response.request.method == 'POST' and response.url.endswith('/analyze') else None)
         try:
             await page.goto(BASE)
-            await page.get_by_text('더보기 · 영상 URL로 선택', exact=True).click()
+            await page.get_by_role('button',name='채널 추가',exact=True).click()
             for video_id in ['akn-AvCeHBI', 'DvxMfC_KjX0']:
                 await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/' + video_id)
                 async with page.expect_response(lambda response: response.url.endswith('/api/videos/resolve') and response.request.method == 'POST') as resolved:
