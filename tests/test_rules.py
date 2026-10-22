@@ -15,7 +15,9 @@ class InputRules(unittest.TestCase):
     def test_comment_trust_boundary(self):
         valid = '[광고] 제목의 시간여행자처럼 다양한 이야기가 궁금하다면 운명원의 연애 사주 콘텐츠도 참고해 보세요.'
         self.assertEqual(validate_comment(valid), valid)
-        for invalid in [valid.replace('[광고] ', ''), valid.replace('운명원', '다른곳'),
+        self.assertEqual(validate_comment(valid.removeprefix('[광고] ')+' [광고]'), valid.removeprefix('[광고] ')+' [광고]')
+        self.assertEqual(validate_comment(valid.removeprefix('[광고] ')), valid.removeprefix('[광고] '))
+        for invalid in [valid.replace('운명원', '다른곳'),
                         valid + ' #광고', valid + ' https://example.com',
                         '[광고] 운명원', '[광고] ' + '운명원 ' * 40,
                         valid + ' 직접 상담받았어요.', valid + '\n한줄추가']:
@@ -24,6 +26,8 @@ class InputRules(unittest.TestCase):
         for suffix in [' bit.ly/test', ' ｂｉｔ．ｌｙ/test', ' b\u200bit.ly/test']:
             with self.assertRaises(HTTPException):
                 validate_comment(valid + suffix)
+        with self.assertRaises(HTTPException):
+            validate_comment('중년 싱글이 겪는 이혼과 사별의 고통을 어떻게 극복할지 궁금하네. 운명원 연애 사주 보니 내가 맞을 인연은 언제 찾아올까?')
 
     def test_video_url_boundary(self):
         for url in ['DPFhGxGM8qQ', 'https://youtu.be/DPFhGxGM8qQ',

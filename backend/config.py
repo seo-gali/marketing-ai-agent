@@ -17,7 +17,7 @@ OLLAMA_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
 ollama_address = urlparse(OLLAMA_URL)
 if ollama_address.hostname not in {'localhost', '127.0.0.1', '::1'} or ollama_address.scheme not in {'http', 'https'} or ollama_address.username or ollama_address.password or ollama_address.query or ollama_address.fragment:
     raise ValueError('OLLAMA_BASE_URL must use a local host')
-MODEL = os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:7b')
+MODEL = os.getenv('OLLAMA_MODEL', 'qwen3.5:4b')
 if not MODEL.strip():
     raise ValueError('OLLAMA_MODEL must not be empty')
 database_url = os.getenv('DATABASE_URL', 'sqlite:///./data/marketing-agent.db')

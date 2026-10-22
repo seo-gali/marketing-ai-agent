@@ -13,11 +13,10 @@
     <a class="skip" href="#main">본문으로 이동</a>
     <main id="main" tabindex="-1">
       <header>
-        <span class="eyebrow">프로젝트 소개 · WINDOWS LOCAL APP</span>
         <h1>Marketing AI Agent</h1>
-        <p>YouTube 영상 조회, AI 댓글 초안 작성, Chrome 게시를 연결한 로컬 대시보드.</p>
         <div class="actions">
           <button class="button primary" data-doc="README.md" data-title="설치·실행 방법">설치·실행 방법</button>
+          <button class="button" data-doc="docs/demo-scenario.md" data-title="촬영 시나리오">촬영 시나리오</button>
         </div>
       </header>
 
@@ -46,7 +45,7 @@
               <p>본문 승인 후 글자별 입력 → 게시 → 확인</p>
             </li>
           </ol>
-          <p class="note">본인 테스트 영상에서 글자별 입력·게시·댓글 확인 완료. 광고 관계를 밝히고 승인한 본문만 게시하는 방식입니다.</p>
+          <p class="note">본인 테스트 영상에서 글자별 입력·게시·댓글 확인 완료. 근거와 댓글을 검토한 뒤 승인한 본문만 게시하는 방식입니다.</p>
         </section>
 
         <section class="card" aria-labelledby="stack-title">
@@ -57,14 +56,14 @@
             <div><dt>저장</dt><dd>SQLite</dd></div>
             <div><dt>AI</dt><dd>Ollama</dd></div>
           </dl>
-          <p class="small">실행 환경: Windows 11 · Chrome · qwen2.5-coder:7b</p>
+          <p class="small">실행 환경: Windows 11 · Chrome · Ollama 0.40.8 · qwen3.5:4b</p>
           <p class="small">이 페이지는 프로젝트 안내용입니다. 앱 실행은 README의 로컬 설치 절차를 따릅니다.</p>
         </section>
 
         <section class="card" aria-labelledby="rules-title">
           <h2 id="rules-title">게시 전 확인하는 조건</h2>
           <ul class="checks">
-            <li>광고 표시 · 본문 승인 · 40~120자</li>
+            <li>실제 장면·발언 반영 · 본문 승인 · 40~120자</li>
             <li>허용 채널 · 영상당 1건 · 하루 최대 10건</li>
             <li>출처 표시 · 허위 이용 경험과 링크 차단</li>
             <li>게시 확인 불가 시 자동 재게시 금지</li>
@@ -84,7 +83,7 @@
               <li>실제 1회 게시 · 다른 계정의 공개 확인</li>
               <li>게시 제한 · 동시 중복 차단 · 이력</li>
               <li>프로필 추가·선택 · 설정·이력 정리 · 다크 모드</li>
-              <li>Python 검사 24건 · 화면 E2E · 빌드</li>
+              <li>Python 검사 39건 · 화면 E2E · 빌드</li>
               <li>키보드 조작 · 모바일 · 주요 텍스트 대비</li>
             </ul>
           </section>
@@ -94,7 +93,7 @@
             <ul class="checks">
               <li>OCR 인용과 캡처의 게시 전 대조</li>
               <li>유튜브2·3 실제 계정 로그인·게시</li>
-              <li>전체 영상·음성 분석은 구현 범위 외</li>
+              <li>공개 자막 미확보 영상의 전체 발언·음성 분석</li>
               <li>2~3분 실제 게시 시연 영상</li>
               <li>NVDA·JAWS 실기기 검수</li>
             </ul>
@@ -126,7 +125,7 @@
         </section>
       </section>
 
-      <footer>© 2026 <a href="https://github.com/seo-gali/marketing-ai-agent">seo-gali/marketing-ai-agent</a> · 검증일 2026-10-21</footer>
+      <footer>© 2026 <a href="https://github.com/seo-gali/marketing-ai-agent">seo-gali/marketing-ai-agent</a> · 검증일 2026-10-23</footer>
     </main>
 
     <dialog id="document-dialog" aria-labelledby="document-title">

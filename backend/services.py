@@ -2,6 +2,10 @@ import json
 import re
 import os
 import subprocess
+import base64
+import socket
+from contextlib import nullcontext
+from http.client import HTTPConnection, HTTPSConnection, HTTPException as HTTPClientError
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode, urlparse, parse_qs
@@ -13,25 +17,76 @@ from fastapi import HTTPException
 from . import config
 
 
-def ocr_frame(path):
+def ocr_frame(path, cancellation=None):
     image = Path(path).resolve()
     if not image.is_relative_to(config.ROOT / 'local' / 'screenshots') or image.suffix != '.png':
         raise ValueError('영상 캡처 경로만 OCR에 사용할 수 있습니다.')
+    capabilities = request_json(config.OLLAMA_URL + '/api/show', {'model': config.MODEL}, cancellation=cancellation).get('capabilities', [])
+    if 'vision' in capabilities:
+        response = request_json(config.OLLAMA_URL + '/api/chat', {
+            'model': config.MODEL, 'stream': False, 'think': False,
+            'format': {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['lines']},
+            'messages': [{'role': 'user', 'content': '화면 아래쪽의 한국어 영상 자막만 글자 그대로 읽어 JSON {"lines":[]}로 반환하세요. 로고·구독 버튼·조작 버튼은 제외하세요. 해석·수정·추측 없이, 읽을 수 없으면 빈 배열을 반환하세요.',
+                          'images': [base64.b64encode(image.read_bytes()).decode('ascii')]}],
+            'options': {'temperature': 0, 'num_ctx': 16384, 'num_predict': 250},
+        }, timeout=120, cancellation=cancellation)
+        try:
+            lines = json.loads(response['message']['content'])['lines']
+            if not isinstance(lines, list):
+                raise ValueError()
+            return [line for line in lines if isinstance(line, str) and len(re.findall('[가-힣]', line)) >= 5 and re.fullmatch(r'[가-힣\s\d.,!?…“”‘’·]+', line)]
+        except (ValueError, KeyError, TypeError):
+            raise HTTPException(503, '화면 자막 인식 결과를 읽지 못했습니다. 다시 분석하세요.') from None
     shell = Path(os.environ.get('SystemRoot', 'C:/Windows')) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
     try:
-        result = subprocess.run([str(shell), '-NoProfile', '-NonInteractive', '-File', str(config.ROOT / 'scripts/ocr_frame.ps1'),
-                                 '-ImagePath', str(image)], capture_output=True, encoding='utf-8', timeout=25,
-                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0, check=True)
-        lines = json.loads(result.stdout.lstrip('\ufeff'))['lines']
+        with subprocess.Popen([str(shell), '-NoProfile', '-NonInteractive', '-File', str(config.ROOT / 'scripts/ocr_frame.ps1'), '-ImagePath', str(image)],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8',
+                              creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0) as process:
+            with cancellation.watch(process.terminate) if cancellation else nullcontext():
+                try:
+                    output, _ = process.communicate(timeout=25)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                    raise
+                if cancellation:
+                    cancellation.check()
+                if process.returncode:
+                    raise subprocess.SubprocessError()
+        lines = json.loads(output.lstrip('\ufeff'))['lines']
         return [line for line in lines if len(re.findall('[가-힣]', line)) >= 5 and re.fullmatch(r'[가-힣\s\d.,!?…“”‘’·]+', line)]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError):
         raise HTTPException(503, 'Windows 한국어 OCR 실행 실패. 한국어 OCR 언어와 로컬 스크립트 실행 정책을 확인하세요.') from None
 
 
-def request_json(url: str, payload=None, timeout=20, headers=None):
+def request_json(url: str, payload=None, timeout=20, headers=None, cancellation=None):
     request = Request(url, data=None if payload is None else json.dumps(payload).encode(),
                       headers=headers or ({'Content-Type': 'application/json'} if payload is not None else {}))
     try:
+        if cancellation:
+            address = urlparse(url)
+            connection = (HTTPSConnection if address.scheme == 'https' else HTTPConnection)(address.hostname, address.port, timeout=timeout)
+            active_socket = None
+            def stop():
+                try:
+                    current = active_socket or connection.sock
+                    if current:
+                        current.shutdown(socket.SHUT_RDWR)
+                finally:
+                    connection.close()
+            try:
+                with cancellation.watch(stop):
+                    connection.request(request.get_method(), address.path + ('?' + address.query if address.query else ''), body=request.data, headers=dict(request.header_items()))
+                    active_socket = connection.sock
+                    cancellation.check()
+                    response = connection.getresponse()
+                    data = response.read()
+                    cancellation.check()
+                    if response.status >= 400:
+                        raise HTTPException(502, f'외부 API 응답 오류 ({response.status})')
+                    return json.loads(data)
+            finally:
+                connection.close()
         with urlopen(request, timeout=timeout) as response:
             return json.load(response)
     except HTTPError as error:
@@ -42,7 +97,9 @@ def request_json(url: str, payload=None, timeout=20, headers=None):
         except (ValueError, AttributeError, IndexError):
             pass
         raise HTTPException(502, f'외부 API 응답 오류 ({error.code}, {reason})') from None
-    except (URLError, TimeoutError, OSError, ValueError):
+    except (URLError, TimeoutError, OSError, ValueError, HTTPClientError):
+        if cancellation:
+            cancellation.check()
         raise HTTPException(503, '외부 서비스 연결 실패 또는 응답 시간 초과') from None
 
 
@@ -60,11 +117,11 @@ def health():
             'test_video_ids': sorted(config.TEST_IDS)}
 
 
-def youtube(resource, **params):
+def youtube(resource, cancellation=None, **params):
     if not config.YOUTUBE_KEY:
         raise HTTPException(503, 'YouTube API 키가 없습니다. .env의 YOUTUBE_API_KEY를 설정하세요.')
     return request_json('https://www.googleapis.com/youtube/v3/' + resource + '?' + urlencode(params),
-                        headers={'X-Goog-Api-Key': config.YOUTUBE_KEY})
+                        headers={'X-Goog-Api-Key': config.YOUTUBE_KEY}, cancellation=cancellation)
 
 
 def video_id(value):
@@ -95,8 +152,8 @@ def normalize_video(item):
             'description': snippet.get('description', '')}
 
 
-def fetch_video(value):
-    items = youtube('videos', part='snippet', id=video_id(value)).get('items', [])
+def fetch_video(value, cancellation=None):
+    items = youtube('videos', cancellation=cancellation, part='snippet', id=video_id(value)).get('items', [])
     if not items:
         raise HTTPException(404, '접근 가능한 영상을 찾을 수 없습니다.')
     return normalize_video(items[0])
@@ -106,9 +163,10 @@ def allowed(video):
     return video['channel_id'] in config.CHANNELS or video['id'] in config.TEST_IDS
 
 
-def discover():
-    channels = youtube('channels', part='contentDetails', id=','.join(config.CHANNELS)).get('items', [])
-    warnings = [f'{name}: 채널을 찾을 수 없습니다.' for key, name in config.CHANNELS.items()
+def discover(channel_id=None):
+    selected = {channel_id: config.CHANNELS[channel_id]} if channel_id else config.CHANNELS
+    channels = youtube('channels', part='contentDetails', id=','.join(selected)).get('items', [])
+    warnings = [f'{name}: 채널을 찾을 수 없습니다.' for key, name in selected.items()
                 if key not in {item['id'] for item in channels}]
 
     def uploads(channel):

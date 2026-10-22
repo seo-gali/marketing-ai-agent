@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import re
 from pathlib import Path
 import socket
 import subprocess
@@ -174,6 +175,39 @@ async def verify():
                     await page.screenshot(path=ARTIFACTS / 'settings-mobile.png', full_page=True)
                     assert not posting and not page_errors, (posting, page_errors)
                     result['checks'].append('desktop_mobile_menu_and_zero_external_posts_or_page_errors')
+                    notifications=await chrome.new_page()
+                    await notifications.clock.install(time='2026-10-21T00:00:00Z')
+                    await notifications.clock.pause_at('2026-10-21T00:00:01Z')
+                    await notifications.goto(BASE+'/settings')
+                    await expect(notifications.get_by_role('button',name='API 상태 확인',exact=True)).to_be_enabled()
+                    show_notice=notifications.get_by_role('button',name='임시 초안 삭제',exact=True)
+                    toast=notifications.locator('#global-message')
+                    await show_notice.click()
+                    await notifications.clock.fast_forward(9999)
+                    await expect(toast).not_to_have_class(re.compile('toast-fading'))
+                    await notifications.clock.fast_forward(1)
+                    await expect(toast).to_have_class(re.compile('toast-fading'))
+                    await show_notice.click()
+                    await expect(toast).not_to_have_class(re.compile('toast-fading'))
+                    await notifications.clock.fast_forward(300)
+                    await expect(toast).to_be_visible()
+                    await notifications.clock.fast_forward(9699)
+                    await expect(toast).not_to_have_class(re.compile('toast-fading'))
+                    await notifications.clock.fast_forward(1)
+                    await expect(toast).to_have_class(re.compile('toast-fading'))
+                    await notifications.clock.fast_forward(300)
+                    await expect(toast).to_have_count(0)
+                    await show_notice.click()
+                    await notifications.get_by_role('button',name='알림 닫기',exact=True).click()
+                    await expect(toast).to_have_count(0)
+                    await expect(notifications.locator('#main-content')).to_be_focused()
+                    await notifications.emulate_media(reduced_motion='reduce')
+                    await show_notice.click()
+                    assert await toast.evaluate('element=>getComputedStyle(element).transitionDuration')=='0s'
+                    await notifications.clock.fast_forward(10300)
+                    await expect(toast).to_have_count(0)
+                    await notifications.close()
+                    result['checks'].append('toast_10_second_fade_repeat_reset_manual_close_and_reduced_motion')
                     result['status'] = 'passed'
                 except Exception as error:
                     result['error'] = (str(error) or type(error).__name__)[:1500]

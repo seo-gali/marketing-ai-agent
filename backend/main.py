@@ -12,6 +12,9 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config, db, services, analysis, browser
 from .security import LocalSecurity
+from .cancellation import Cancellation, AnalysisCancelled
+
+active_analyses = {}
 
 
 @asynccontextmanager
@@ -38,14 +41,18 @@ class ResolveRequest(BaseModel):
 
 
 @app.get('/api/videos')
-def get_videos(q: str | None = Query(default=None, max_length=100)):
+def get_videos(q: str | None = Query(default=None, max_length=100), channel: str | None = None):
     if q is not None and (not unicodedata.normalize('NFKC', q).strip() or any(unicodedata.category(character) in {'Cc', 'Cf'} for character in q)):
         raise HTTPException(422, '검색어를 입력하세요. 전체 조회는 영상 불러오기를 사용하세요.')
-    videos, warnings = services.discover()
+    if channel is not None and channel not in config.CHANNELS:
+        raise HTTPException(422, '지정된 채널만 조회할 수 있습니다.')
+    videos, warnings = services.discover(channel) if channel else services.discover()
     db.save_videos(videos)
     if q is not None:
         videos = [video for video in videos if q.strip().casefold() in (video['title'] + ' ' + video['channel']).casefold()]
-    return {'videos': [{**video, 'allowed': services.allowed(video)} for video in videos], 'warnings': warnings}
+    selected = {channel: config.CHANNELS[channel]} if channel else config.CHANNELS
+    loaded = [key for key, name in selected.items() if not any(warning.startswith(name + ':') for warning in warnings)]
+    return {'videos': [{**video, 'allowed': services.allowed(video)} for video in videos], 'warnings': warnings, 'loaded_channels': loaded}
 
 
 @app.post('/api/videos/resolve')
@@ -65,16 +72,48 @@ def get_video(video_id: str):
 
 @app.post('/api/videos/{video_id}/analyze')
 async def analyze_video(video_id: str):
+    video_id = services.video_id(video_id)
+    if active_analyses:
+        raise HTTPException(409, '다른 영상 분석이 진행 중입니다.')
+    cancellation = Cancellation()
+    active_analyses[video_id] = (asyncio.current_task(), cancellation)
+    worker = None
     try:
-        video = await asyncio.to_thread(services.fetch_video, video_id)
+        db.log('analysis_progress', '영상 정보 확인 중', video_id)
+        video = await asyncio.to_thread(services.fetch_video, video_id, cancellation=cancellation)
         db.save_videos([video])
-        transcript, warnings = await browser.collect_video_evidence(video)
-        result = await asyncio.to_thread(analysis.generate, video, transcript, warnings)
+        transcript, warnings = await browser.collect_video_evidence(video, cancellation=cancellation)
+        worker = asyncio.create_task(asyncio.to_thread(analysis.generate, video, transcript, warnings, cancellation=cancellation))
+        result = await asyncio.shield(worker)
         db.log('analysis_complete', '실제 Ollama 분석 및 초안 저장', video['id'])
         return result
+    except (asyncio.CancelledError, AnalysisCancelled):
+        cancellation.cancel()
+        if worker:
+            try:
+                await worker
+            except (AnalysisCancelled, HTTPException, asyncio.CancelledError):
+                pass
+        db.log('analysis_cancelled', '사용자가 분석을 취소했습니다.', video_id)
+        raise HTTPException(409, '분석이 취소되었습니다.') from None
     except HTTPException as error:
         db.log('analysis_failed', error.detail, video_id)
         raise
+    finally:
+        active_analyses.pop(video_id, None)
+
+
+@app.post('/api/videos/{video_id}/analyze/cancel')
+async def cancel_analysis(video_id: str):
+    running = active_analyses.get(services.video_id(video_id))
+    if not running or not running[1].cancel():
+        return {'status': 'completed'}
+    running[0].cancel()
+    try:
+        await asyncio.shield(running[0])
+    except (HTTPException, asyncio.CancelledError):
+        pass
+    return {'status': 'cancelled'}
 
 
 class DraftRequest(BaseModel):
@@ -179,6 +218,11 @@ async def post_comment(body: PostingRequest):
         if body.approved is not True:
             raise HTTPException(422, '댓글 본문을 검토하고 광고 게시를 승인하세요.')
         video = await asyncio.to_thread(services.fetch_video, body.video_id)
+        if not services.allowed(video):
+            raise HTTPException(403, '허용 채널 또는 등록된 본인 테스트 영상에만 게시할 수 있습니다.')
+        grounded = db.get_analysis(video['id'])
+        if video['id'] not in config.TEST_IDS and (not grounded or not grounded.get('scene_verified')):
+            raise HTTPException(422, '영상 발언 근거를 확보한 뒤 댓글을 게시하세요.')
         if browser.lock.locked():
             raise HTTPException(409, '다른 Chrome 작업이 진행 중입니다.')
         db.save_videos([video])

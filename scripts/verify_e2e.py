@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -26,7 +27,30 @@ async def main():
             await page.reload()
             assert await page.evaluate("localStorage.getItem('marketing-ai:draft:expired-test')") is None
             await page.get_by_role('button', name='외롭여', exact=True).wait_for()
-            await page.get_by_role('button', name='① 영상 불러오기').click()
+            channel_ids=list((await (await page.request.get(BASE+'/api/health')).json())['channels'])
+            fixture={'id':'fixture0001','channel_id':channel_ids[0],'channel':'외롭여','title':'분리된 채널 조회 검사','description':'','thumbnail':'','published_at':'2026-10-23','allowed':True}
+            async def partial_list(route):
+                selected=channel_ids[1] if '?channel=' in route.request.url else channel_ids[0]
+                await route.fulfill(json={'videos':[{**fixture,'channel_id':selected}], 'warnings':[], 'loaded_channels':[selected]})
+            await page.route('**/api/videos?**',partial_list)
+            await page.route('**/api/videos',partial_list)
+            await page.get_by_role('button',name='영상 불러오기',exact=True).click()
+            await expect(page.locator('.video-item')).to_have_count(1)
+            await page.get_by_role('searchbox',name='영상 검색').fill('없는 검색어')
+            await page.get_by_role('button',name='리즈시절 LizTV',exact=True).click()
+            await expect(page.get_by_role('searchbox',name='영상 검색')).to_have_value('')
+            await expect(page.get_by_role('button',name='영상 불러오기',exact=True)).to_be_visible()
+            async with page.expect_request(lambda request:'?channel=' in request.url):
+                await page.get_by_role('button',name='영상 불러오기',exact=True).click()
+            await expect(page.locator('.video-item')).to_have_count(1)
+            await page.get_by_role('button',name='전체 채널',exact=True).click()
+            await expect(page.locator('.video-item')).to_have_count(2)
+            await page.unroute('**/api/videos?**',partial_list)
+            await page.unroute('**/api/videos',partial_list)
+            await page.evaluate("localStorage.removeItem('marketing-ai:filters')")
+            await page.reload()
+            result['checks'].append({'missing_channel_load_button_scoped_request_search_reset_and_merge':'passed'})
+            await page.get_by_role('button', name='영상 불러오기', exact=True).click()
             await page.locator('.video-item').first.wait_for(timeout=45000)
             videos = await page.locator('.video-item').count()
             assert videos > 0
@@ -56,20 +80,20 @@ async def main():
             for query in ['']:
                 rejected=await page.request.get(BASE+'/api/videos',params={'q':query})
                 assert rejected.status==422
-            await page.get_by_role('button', name='전체 목록 보기', exact=True).click()
+            await page.get_by_role('button', name='전체 채널', exact=True).click()
             assert await page.locator('.video-item').count()==videos
             await page.get_by_role('button',name='실행 취소',exact=True).click()
             assert await page.locator('.video-item').count()==0
-            await page.get_by_role('button',name='전체 목록 보기',exact=True).click()
+            await page.get_by_role('button',name='전체 채널',exact=True).click()
             result['checks'].append({'filter_and_empty_search': 'passed', 'empty_query_api':422})
             await page.get_by_role('button',name='채널 추가',exact=True).click()
-            await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/akn-AvCeHBI')
+            await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/FBGY7JIM-84')
             await page.get_by_role('button', name='링크 확인').click()
             await expect(page.locator('#draft')).not_to_have_value('',timeout=240000)
             assert await page.get_by_role('button',name='실행 취소',exact=True).count()==0
             draft = await page.locator('#draft').input_value()
-            assert 40 <= len(draft) <= 120 and draft.startswith('[광고]') and '운명원' in draft
-            await expect(page.locator('#analysis-title')).to_have_text('남자의 연애 작동원리')
+            assert 40 <= len(draft) <= 120 and '운명원' in draft
+            await expect(page.locator('#analysis-title')).to_have_text('회피형 후폭풍, 왜 늦을까? 그리워도 쉽게 돌아오지 못하는 이유 #러브커넥트 #연애심리치유 #유지연')
             await expect(page.locator('.video-item')).to_have_count(1)
             await page.get_by_role('button', name='전체 채널', exact=True).click()
             await expect(page.locator('.video-item')).to_have_count(videos)
@@ -78,9 +102,9 @@ async def main():
             await expect(page.locator('#video-url')).to_be_visible()
             await expect(page.locator('.video-item')).to_have_count(1)
             result['checks'].append({'url_tab_and_results_isolated_from_channel_list':'passed'})
-            button = page.get_by_role('button', name='③ 댓글 달기', exact=True)
+            button = page.get_by_role('button', name='댓글 달기', exact=True)
             assert await button.is_disabled()
-            approval = page.get_by_role('checkbox', name='현재 본문을 확인했으며 광고 댓글 게시를 승인합니다.')
+            approval = page.get_by_role('checkbox', name='이 댓글의 게시를 승인합니다.')
             await approval.check()
             assert await button.is_enabled()
             await page.locator('#draft').fill(draft + ' ')
@@ -95,27 +119,60 @@ async def main():
             result['checks'].append({'draft_edit_and_approval_reset': 'passed', 'draft_length': len(draft)})
             edited=draft.replace('운명원','운명원의')
             await page.locator('#draft').fill(edited)
-            await expect(page.get_by_text('이 브라우저에 임시 저장됨 · 7일 보관',exact=True)).to_be_visible()
-            assert await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:akn-AvCeHBI')).text")==edited
+            async with asyncio.timeout(5):
+                while await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:FBGY7JIM-84'))?.text") != edited:
+                    await asyncio.sleep(.05)
+            assert await page.evaluate("JSON.parse(localStorage.getItem('marketing-ai:draft:FBGY7JIM-84')).text")==edited
             await page.reload()
             await page.get_by_role('button',name='채널 추가',exact=True).click()
-            await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/akn-AvCeHBI')
+            await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/FBGY7JIM-84')
             await page.get_by_role('button',name='링크 확인',exact=True).click()
             await expect(page.locator('#draft')).to_have_value(edited)
             assert not await page.get_by_role('checkbox').is_checked()
             await page.locator('#draft').fill(draft)
             await page.get_by_role('button',name='수정 저장').click()
             result['checks'].append({'local_draft_recovery_without_approval':'passed'})
+            analysis_started=asyncio.Event()
+            release_analysis=asyncio.Event()
+
+            async def delayed_analysis_failure(route):
+                analysis_started.set()
+                await release_analysis.wait()
+                await route.fulfill(status=503,json={'detail':'검증용 분석 오류'})
+
+            await page.route('**/api/videos/FBGY7JIM-84/analyze',delayed_analysis_failure)
+            await page.get_by_role('button',name='초안 다시 생성',exact=True).click()
+            await asyncio.wait_for(analysis_started.wait(),timeout=10)
+            dialog=page.get_by_role('dialog',name='영상을 분석하고 있습니다',exact=True)
+            await expect(dialog).to_be_visible()
+            await expect(dialog.get_by_role('progressbar')).to_be_visible()
+            await expect(dialog.locator('.analysis-elapsed')).to_contain_text('초 경과')
+            await expect(dialog.locator('.analysis-elapsed')).not_to_have_text('0분 0초 경과', timeout=3000)
+            navigation=await page.get_by_role('link',name='작업 이력',exact=True).bounding_box()
+            await page.mouse.click(navigation['x']+navigation['width']/2,navigation['y']+navigation['height']/2)
+            assert page.url.rstrip('/')==BASE
+            for _ in range(3):
+                await page.keyboard.press('Tab')
+                assert await dialog.evaluate('element=>document.activeElement===document.body||element.contains(document.activeElement)')
+            await page.keyboard.press('Escape')
+            await expect(dialog).to_be_visible()
+            await page.screenshot(path=ARTIFACTS/'analysis-loading.png',full_page=True)
+            release_analysis.set()
+            await expect(dialog).not_to_be_visible()
+            await expect(page.get_by_role('alert')).to_contain_text('검증용 분석 오류')
+            await expect(page.locator('#draft')).to_have_value(draft)
+            await page.unroute('**/api/videos/FBGY7JIM-84/analyze')
+            result['checks'].append({'analysis_loading_blocks_mouse_keyboard_and_unlocks_after_error_fixture':'passed'})
             rejected = await page.request.post(BASE + '/api/posting-jobs', data={
-                'video_id': 'akn-AvCeHBI', 'text': draft, 'approved': False})
+                'video_id': 'FBGY7JIM-84', 'text': draft, 'approved': False})
             assert rejected.status == 422
             forbidden = await page.request.post(BASE + '/api/posting-jobs', data={
                 'video_id': 'jNQXAC9IVRw', 'text': draft, 'approved': True})
             assert forbidden.status == 403
-            invalid = await page.request.post(BASE + '/api/videos/resolve', data={'url': 'https://evil.example/watch?v=akn-AvCeHBI'})
+            invalid = await page.request.post(BASE + '/api/videos/resolve', data={'url': 'https://evil.example/watch?v=FBGY7JIM-84'})
             assert invalid.status == 422
             origin = await page.request.post(BASE + '/api/posting-jobs', headers={'Origin': 'https://evil.example'}, data={
-                'video_id': 'akn-AvCeHBI', 'text': draft, 'approved': True})
+                'video_id': 'FBGY7JIM-84', 'text': draft, 'approved': True})
             assert origin.status == 403
             result['checks'].append({'approval_required': 422, 'channel_denied': 403, 'invalid_url': 422, 'origin_denied': 403})
             for width in [1440, 1024, 390]:

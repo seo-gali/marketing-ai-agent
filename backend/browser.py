@@ -60,16 +60,44 @@ async def screenshot(name=None, target=None):
         return None
 
 
-async def collect_video_evidence(video_data):
+def cached_video_evidence(video_data):
+    previous = db.get_analysis(video_data['id'])
+    if not previous or previous.get('draft_version', 0) < 4:
+        return None
+    sources = previous.get('sources', [])
+    if not any(source['type'] == 'title' and source['text'] == video_data['title'] for source in sources):
+        return None
+    if next((source['text'] for source in sources if source['type'] == 'description'), '') != video_data['description'][:3000]:
+        return None
+    rows = []
+    for source in sources:
+        if source['type'] not in {'transcript', 'frame_ocr'}:
+            continue
+        capture = source.get('capture')
+        if source['type'] == 'frame_ocr' and (not re.fullmatch(r'[a-f0-9]{32}\.png', capture or '') or not (SCREENSHOTS / capture).is_file()):
+            return None
+        seconds = 0
+        for part in source['timestamp'].split(':'):
+            seconds = seconds * 60 + int(part)
+        rows.append({'type': source['type'], 'text': source['text'], 'timestamp': source['timestamp'], 'start_seconds': seconds, 'capture': capture})
+    return (rows, previous['warnings']) if len(rows) >= 4 and rows[-1]['start_seconds'] - rows[0]['start_seconds'] >= 60 else None
+
+
+async def collect_video_evidence(video_data, cancellation=None):
     if lock.locked():
         raise HTTPException(409, 'Chrome 작업이 진행 중입니다. 완료 후 분석하세요.')
     async with lock:
+        cached = cached_video_evidence(video_data)
+        if cached:
+            db.log('analysis_progress', '저장된 자막 근거 재사용 · 영상 재수집 생략', video_data['id'])
+            return cached
         async with async_playwright() as reader:
             chromium = await reader.chromium.launch(channel='chrome', headless=True)
             reading = await chromium.new_page(locale='ko-KR', viewport={'width': 1365, 'height': 900})
             reading.set_default_timeout(12000)
             try:
                 video_id = video_data['id']
+                db.log('analysis_progress', 'YouTube 공개 자막 확인 중', video_id)
                 await reading.goto(f'https://www.youtube.com/watch?v={video_id}&hl=ko', wait_until='domcontentloaded')
                 await reading.locator('ytd-masthead').wait_for()
                 blocked = reading.locator('iframe[src*="recaptcha"], #captcha-form, ytd-enforcement-message-view-model')
@@ -119,12 +147,21 @@ async def collect_video_evidence(video_data):
                     except PlaywrightTimeoutError:
                         pass
 
-                # 공개 스크립트 응답 실패 시 실제 재생 화면의 자막만 OCR로 수집
+                # 공개 스크립트 응답 실패 시 분산된 실제 재생 화면의 자막 수집
                 frames = []
-                # shortcut: 초반 네 구간만 확인, 전체 내용 분석이 필요할 때 수집 범위 확장
-                for _ in range(4):
+                duration = await media.evaluate('element => element.duration')
+                # shortcut: 8개 지점 표본 수집, 전체 발언이 필요하면 공개 자막 확보
+                targets = [None] + [int(duration * index / 8) for index in range(1, 8)] if duration and duration < 86400 else [None]
+                for index, target in enumerate(targets):
+                    db.log('analysis_progress', f'화면 자막 수집 중 · {index + 1}/{len(targets)} 지점', video_id)
+                    if target is not None:
+                        await reading.goto(f'https://www.youtube.com/watch?v={video_id}&t={target}s&hl=ko', wait_until='domcontentloaded')
+                        await media.wait_for()
+                        await media.evaluate('element => { element.muted = true; }')
+                        if await media.evaluate('element => element.paused'):
+                            await reading.locator('.ytp-play-button').click()
                     await wait_content()
-                    target = await media.evaluate('element => element.currentTime + 8')
+                    target = target + 2 if target is not None else await media.evaluate('element => element.currentTime + 8')
                     await media.evaluate('element => element.play()')
                     actual = await media.evaluate('''(element, seconds) => new Promise(resolve => {
                         let callback;
@@ -138,7 +175,7 @@ async def collect_video_evidence(video_data):
                         };
                         const timeout = setTimeout(() => finish(null), 15000);
                         const frame = (_, metadata) => {
-                            if (metadata.mediaTime >= seconds && !element.seeking && element.readyState >= 2) {
+                            if (metadata.mediaTime >= seconds && metadata.mediaTime <= seconds + 15 && !element.seeking && element.readyState >= 2) {
                                 element.pause();
                                 requestAnimationFrame(() => finish(metadata.mediaTime));
                             } else callback = element.requestVideoFrameCallback(frame);
@@ -146,22 +183,27 @@ async def collect_video_evidence(video_data):
                         callback = element.requestVideoFrameCallback(frame);
                     })''', target)
                     if actual is None:
-                        db.log('evidence_unavailable', '영상 프레임 재생 대기 시간 초과. 원문 근거로 사용하지 않음.', video_id)
-                        break
+                        db.log('evidence_unavailable', f'{int(target)}초 지점의 재생 프레임 미확보. 원문 근거에서 제외.', video_id)
+                        continue
                     if 'ad-showing' in (await player.get_attribute('class') or '').split():
                         continue
                     filename = uuid.uuid4().hex + '.png'
                     SCREENSHOTS.mkdir(parents=True, exist_ok=True)
-                    await reading.mouse.move(1300, 850)
-                    await player.screenshot(path=SCREENSHOTS / filename)
-                    lines = await asyncio.to_thread(services.ocr_frame, SCREENSHOTS / filename)
+                    await player.screenshot(path=SCREENSHOTS / filename, style='.ytp-chrome-bottom,.ytp-chrome-top,.ytp-gradient-bottom {visibility:hidden!important}')
+                    bounds = await player.bounding_box()
+                    subtitle_image = SCREENSHOTS / (uuid.uuid4().hex + '.png')
+                    await reading.screenshot(path=subtitle_image, clip={
+                        'x': bounds['x'], 'y': bounds['y'] + bounds['height'] * .55,
+                        'width': bounds['width'], 'height': bounds['height'] * .45},
+                        style='.ytp-chrome-bottom,.ytp-chrome-top,.ytp-gradient-bottom {visibility:hidden!important}')
+                    lines = await asyncio.to_thread(services.ocr_frame, subtitle_image, cancellation=cancellation)
                     if lines:
                         actual = int(actual)
                         stamp = f'{actual // 60}:{actual % 60:02d}'
                         frames.append({'type': 'frame_ocr', 'timestamp': stamp, 'start_seconds': actual,
                                        'text': ' '.join(lines), 'capture': filename})
                 if frames:
-                    return frames, ['공개 스크립트 응답을 확보하지 못해 영상 초반 네 구간의 화면 자막을 Windows OCR로 읽었습니다. 캡처와 인용문을 대조하세요. 전체 장면 분석은 아닙니다.']
+                    return frames, [f'공개 스크립트 미확보: 영상 전반에 분산한 {len(targets)}개 지점 중 {len(frames)}개 화면 자막을 읽었습니다 ({frames[0]["timestamp"]}~{frames[-1]["timestamp"]}). 표본 분석이며 전체 발언·음성 분석은 아닙니다. 캡처와 인용문을 대조하세요.']
                 return [], ['공개 자막과 화면 문구를 확보하지 못했습니다. 제목·설명·공개 댓글 기준이며 영상 발언 확인 불가.']
             except PlaywrightError:
                 capture = await screenshot(target=reading)

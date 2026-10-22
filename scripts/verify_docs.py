@@ -33,6 +33,14 @@ async def verify(base, published):
         page = await browser.new_page(viewport={'width': 1440, 'height': 1000})
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
+        if not published:
+            async def local_markdown(route):
+                path = route.request.url.split('/marketing-ai-agent/main/', 1)[1]
+                allowed = {'README.md', 'docs/demo-scenario.md', 'docs/results/verification.md', 'docs/results/security-audit.md', 'docs/results/accessibility.md'}
+                if path not in allowed:
+                    return await route.abort()
+                await route.fulfill(content_type='text/plain; charset=utf-8', body=(ROOT / path).read_text(encoding='utf-8'))
+            await page.route('https://raw.githubusercontent.com/seo-gali/marketing-ai-agent/main/**', local_markdown)
         try:
             response = await page.goto(base)
             assert response.status == 200
@@ -71,6 +79,13 @@ async def verify(base, published):
             await expect(dialog).to_be_hidden()
             await expect(install).to_be_focused()
             result['checks'].append('live_readme_tables_code_focus_trap_escape_and_focus_restore')
+            await page.get_by_role('button', name='촬영 시나리오', exact=True).click()
+            await expect(body).to_have_attribute('aria-busy', 'false', timeout=20000)
+            await expect(body.get_by_role('heading', name='시연 영상 촬영안', exact=True)).to_be_visible()
+            assert await body.locator('table').count() == 1
+            assert await body.locator('pre code').count() >= 1
+            await page.get_by_role('button', name='문서 닫기', exact=True).click()
+            result['checks'].append('demo_script_timeline_and_flow_in_markdown_dialog')
 
             await status.click()
             for label, heading in [('구현·실행 결과', '구현 및 검증 결과'), ('보안 감사', '보안 감사'), ('접근성 검수', '접근성·사용성 검수')]:

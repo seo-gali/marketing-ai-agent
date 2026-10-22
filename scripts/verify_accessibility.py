@@ -63,14 +63,14 @@ async def main():
             result['checks'].append('landmarks_headings_labels_and_accessibility_tree')
             await page.goto(BASE)
             contrasts={}
-            for selector,background in [('.heading p','rgb(255,255,255)'),('.eyebrow','rgb(255,255,255)'),('.btn.primary.full-load',None)]:
+            for selector,background in [('.heading h1','rgb(255,255,255)'),('.field-label','rgb(255,255,255)'),('.empty-state .btn.primary',None)]:
                 colors=await page.locator(selector).first.evaluate("element=>({color:getComputedStyle(element).color,background:getComputedStyle(element).backgroundColor})")
                 first=luminance(colors['color']);second=luminance(background or colors['background'])
                 ratio=(max(first,second)+.05)/(min(first,second)+.05)
                 assert ratio>=4.5,(selector,ratio)
                 contrasts[selector]=round(ratio,2)
             result['contrast_samples']=contrasts
-            assert await page.locator('.soft-count').evaluate("element=>getComputedStyle(element).animationName")=='none'
+            assert await page.locator('.analysis-progress .spinner').evaluate("element=>getComputedStyle(element).animationName")=='none'
             result['checks'].append('sample_text_contrast_and_reduced_motion')
             themed=await chromium.new_page(viewport={'width':1440,'height':1000})
             await themed.goto(BASE+'/settings')
@@ -79,7 +79,7 @@ async def main():
             await expect(themed.locator('html')).to_have_attribute('data-theme','dark')
             dark_contrasts={}
             background=await themed.locator('.app-shell').evaluate('element=>getComputedStyle(element).backgroundColor')
-            for selector in ['h1','.setting-card p','.theme-options button[aria-pressed=true]']:
+            for selector in ['h1','.setting-card h2','.theme-options button[aria-pressed=true]']:
                 color=await themed.locator(selector).first.evaluate('element=>getComputedStyle(element).color')
                 first=luminance(color);second=luminance(background)
                 ratio=(max(first,second)+.05)/(min(first,second)+.05)
@@ -91,7 +91,7 @@ async def main():
             result['dark_contrast_samples']=dark_contrasts
             result['checks'].append('dark_theme_keyboard_contrast_and_mobile_overflow')
             await page.set_viewport_size({'width':1440,'height':1000})
-            for selector in ['.avatar','.detail-icon','.search-submit','.top-search']:
+            for selector in ['.brand-mark','.detail-icon','.search-submit','.top-search']:
                 delta=await page.locator(selector).evaluate('element=>{const a=element.getBoundingClientRect(),b=element.querySelector("svg").getBoundingClientRect();return {x:Math.abs(a.x+a.width/2-b.x-b.width/2),y:Math.abs(a.y+a.height/2-b.y-b.height/2)}}')
                 assert delta['y']<.5,(selector,delta)
                 if selector!='.top-search':
