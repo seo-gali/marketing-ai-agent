@@ -114,7 +114,8 @@ def get_analysis(video_id):
     with connect() as connection:
         row = connection.execute('SELECT * FROM analyses WHERE video_id=?', (video_id,)).fetchone()
         draft = connection.execute('SELECT text FROM comment_drafts WHERE video_id=?', (video_id,)).fetchone()
-        return {**json.loads(row['data']), 'model': row['model'], 'created_at': row['created_at'],
+        data = json.loads(row['data']) if row else None
+        return {**data, 'generated_comment': data['comment'], 'model': row['model'], 'created_at': row['created_at'],
                 'comment': draft['text'] if draft else ''} if row else None
 
 
@@ -141,6 +142,12 @@ def log(stage, detail, video_id=None, job_id=None):
     with connect() as connection:
         connection.execute('INSERT INTO activity_logs(job_id,video_id,stage,detail,created_at) VALUES (?,?,?,?,?)',
                            (job_id, video_id, stage, detail, now()))
+
+
+def recent_drafts(video_id):
+    with connect() as connection:
+        return [row['text'] for row in connection.execute(
+            "SELECT d.text FROM comment_drafts d JOIN analyses a ON a.video_id=d.video_id WHERE d.video_id<>? AND json_extract(a.data,'$.draft_version')=10 ORDER BY d.updated_at DESC LIMIT 8", (video_id,))]
 
 
 def reserve_job(video, text, approved, profile='유튜브1'):

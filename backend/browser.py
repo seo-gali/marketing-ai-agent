@@ -1,4 +1,5 @@
 import asyncio
+import json
 import re
 import unicodedata
 import uuid
@@ -11,6 +12,7 @@ from fastapi import HTTPException
 from playwright.async_api import async_playwright, Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
 
 from . import config, db, services
+from .cancellation import Cancellation
 
 lock = asyncio.Lock()
 driver = None
@@ -61,16 +63,20 @@ async def screenshot(name=None, target=None):
 
 
 def cached_video_evidence(video_data):
-    previous = db.get_analysis(video_data['id'])
-    if not previous or previous.get('draft_version', 0) < 4:
+    target = config.ROOT / 'local/cache/scenes' / (services.video_id(video_data['id']) + '.json')
+    try:
+        previous = json.loads(target.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        previous = db.get_analysis(video_data['id'])
+    if not previous or previous.get('draft_version', 0) < 7:
         return None
     sources = previous.get('sources', [])
     if not any(source['type'] == 'title' and source['text'] == video_data['title'] for source in sources):
         return None
-    if next((source['text'] for source in sources if source['type'] == 'description'), '') != video_data['description'][:3000]:
+    if ' '.join(next((source['text'] for source in sources if source['type'] == 'description'), '').split()) != ' '.join(video_data['description'][:3000].split()):
         return None
     rows = []
-    for source in sources:
+    for source in previous.get('captures', sources):
         if source['type'] not in {'transcript', 'frame_ocr'}:
             continue
         capture = source.get('capture')
@@ -80,10 +86,12 @@ def cached_video_evidence(video_data):
         for part in source['timestamp'].split(':'):
             seconds = seconds * 60 + int(part)
         rows.append({'type': source['type'], 'text': source['text'], 'timestamp': source['timestamp'], 'start_seconds': seconds, 'capture': capture})
-    return (rows, previous['warnings']) if len(rows) >= 4 and rows[-1]['start_seconds'] - rows[0]['start_seconds'] >= 60 else None
+    frames = [row for row in rows if row.get('capture')]
+    return (rows, previous['warnings']) if len(frames) == 3 and len({row['timestamp'] for row in frames}) == 3 else None
 
 
 async def collect_video_evidence(video_data, cancellation=None):
+    cancellation = cancellation or Cancellation()
     if lock.locked():
         raise HTTPException(409, 'Chrome 작업이 진행 중입니다. 완료 후 분석하세요.')
     async with lock:
@@ -127,6 +135,7 @@ async def collect_video_evidence(video_data, cancellation=None):
                 expand = reading.locator('#description-inline-expander #expand:visible').first
                 if await expand.count():
                     await expand.click()
+                transcript = []
                 button = reading.get_by_role('button', name=re.compile(r'^스크립트 표시$|^Show transcript$'))
                 if await button.count():
                     await button.first.click()
@@ -134,7 +143,6 @@ async def collect_video_evidence(video_data, cancellation=None):
                     try:
                         await segments.first.wait_for(state='visible', timeout=5000)
                         values = await segments.evaluate_all('items => items.map(item => ({timestamp: item.querySelector(".segment-timestamp")?.textContent.trim(), text: item.querySelector(".segment-text")?.textContent.trim()}))')
-                        transcript = []
                         for item in values[:2000]:
                             if not item['text'] or not re.fullmatch(r'(?:\d+:)?\d{1,2}:\d{2}', item['timestamp'] or ''):
                                 continue
@@ -142,69 +150,67 @@ async def collect_video_evidence(video_data, cancellation=None):
                             for number in item['timestamp'].split(':'):
                                 seconds = seconds * 60 + int(number)
                             transcript.append({'type': 'transcript', 'timestamp': item['timestamp'], 'start_seconds': seconds, 'text': normalize(item['text'])[:500]})
-                        if transcript:
-                            return transcript, ['공개 자막 발언 근거입니다. 자동 자막 오인식 가능성이 있어 원문 확인이 필요합니다.']
                     except PlaywrightTimeoutError:
                         pass
 
-                # 공개 스크립트 응답 실패 시 분산된 실제 재생 화면의 자막 수집
-                frames = []
                 duration = await media.evaluate('element => element.duration')
-                # shortcut: 8개 지점 표본 수집, 전체 발언이 필요하면 공개 자막 확보
-                targets = [None] + [int(duration * index / 8) for index in range(1, 8)] if duration and duration < 86400 else [None]
-                for index, target in enumerate(targets):
-                    db.log('analysis_progress', f'화면 자막 수집 중 · {index + 1}/{len(targets)} 지점', video_id)
-                    if target is not None:
+                if not duration or duration >= 10800:
+                    return transcript, []
+                frames, images = [], []
+                for index, target in enumerate([int(duration * fraction) for fraction in (.2, .5, .8)]):
+                    cancellation.check()
+                    db.log('analysis_progress', f'영상 화면 수집 중 · {index + 1}/3', video_id)
+                    actual = None
+                    for _ in range(2):
+                        cancellation.check()
                         await reading.goto(f'https://www.youtube.com/watch?v={video_id}&t={target}s&hl=ko', wait_until='domcontentloaded')
                         await media.wait_for()
-                        await media.evaluate('element => { element.muted = true; }')
-                        if await media.evaluate('element => element.paused'):
-                            await reading.locator('.ytp-play-button').click()
-                    await wait_content()
-                    target = target + 2 if target is not None else await media.evaluate('element => element.currentTime + 8')
-                    await media.evaluate('element => element.play()')
-                    actual = await media.evaluate('''(element, seconds) => new Promise(resolve => {
-                        let callback;
-                        let finished = false;
-                        const finish = value => {
-                            if (finished) return;
-                            finished = true;
-                            clearTimeout(timeout);
-                            element.cancelVideoFrameCallback(callback);
-                            resolve(value);
-                        };
-                        const timeout = setTimeout(() => finish(null), 15000);
-                        const frame = (_, metadata) => {
-                            if (metadata.mediaTime >= seconds && metadata.mediaTime <= seconds + 15 && !element.seeking && element.readyState >= 2) {
-                                element.pause();
-                                requestAnimationFrame(() => finish(metadata.mediaTime));
-                            } else callback = element.requestVideoFrameCallback(frame);
-                        };
-                        callback = element.requestVideoFrameCallback(frame);
-                    })''', target)
+                        await media.evaluate('element => {element.muted=true; element.play()}')
+                        await wait_content()
+                        actual = await media.evaluate('''(element, seconds) => new Promise(resolve => {
+                            let callback, finished=false;
+                            const finish = value => {
+                                if(finished) return;
+                                finished=true; clearTimeout(timer); element.cancelVideoFrameCallback(callback); resolve(value);
+                            };
+                            const timer=setTimeout(()=>finish(null),10000);
+                            const frame=(_, data)=>{
+                                if(data.mediaTime>=seconds && data.mediaTime<=seconds+12 && !element.seeking && element.readyState>=2) {
+                                    element.pause(); requestAnimationFrame(()=>finish(data.mediaTime));
+                                } else callback=element.requestVideoFrameCallback(frame);
+                            };
+                            callback=element.requestVideoFrameCallback(frame);
+                        })''', target + 1)
+                        if actual is not None and 'ad-showing' not in (await player.get_attribute('class') or '').split():
+                            break
+                        actual = None
                     if actual is None:
-                        db.log('evidence_unavailable', f'{int(target)}초 지점의 재생 프레임 미확보. 원문 근거에서 제외.', video_id)
                         continue
-                    if 'ad-showing' in (await player.get_attribute('class') or '').split():
-                        continue
-                    filename = uuid.uuid4().hex + '.png'
                     SCREENSHOTS.mkdir(parents=True, exist_ok=True)
+                    filename = uuid.uuid4().hex + '.png'
                     await player.screenshot(path=SCREENSHOTS / filename, style='.ytp-chrome-bottom,.ytp-chrome-top,.ytp-gradient-bottom {visibility:hidden!important}')
                     bounds = await player.bounding_box()
-                    subtitle_image = SCREENSHOTS / (uuid.uuid4().hex + '.png')
-                    await reading.screenshot(path=subtitle_image, clip={
-                        'x': bounds['x'], 'y': bounds['y'] + bounds['height'] * .55,
-                        'width': bounds['width'], 'height': bounds['height'] * .45},
-                        style='.ytp-chrome-bottom,.ytp-chrome-top,.ytp-gradient-bottom {visibility:hidden!important}')
-                    lines = await asyncio.to_thread(services.ocr_frame, subtitle_image, cancellation=cancellation)
-                    if lines:
-                        actual = int(actual)
-                        stamp = f'{actual // 60}:{actual % 60:02d}'
-                        frames.append({'type': 'frame_ocr', 'timestamp': stamp, 'start_seconds': actual,
-                                       'text': ' '.join(lines), 'capture': filename})
+                    crop = SCREENSHOTS / (uuid.uuid4().hex + '.png')
+                    await reading.screenshot(path=crop, clip={'x':bounds['x'], 'y':bounds['y']+bounds['height']*.55,
+                                            'width':bounds['width'], 'height':bounds['height']*.45},
+                                            style='.ytp-chrome-bottom,.ytp-chrome-top,.ytp-gradient-bottom {visibility:hidden!important}')
+                    seconds = int(actual)
+                    frames.append({'type':'frame_ocr', 'timestamp':f'{seconds // 60}:{seconds % 60:02d}',
+                                   'start_seconds':seconds, 'capture':filename})
+                    images.append(crop)
                 if frames:
-                    return frames, [f'공개 스크립트 미확보: 영상 전반에 분산한 {len(targets)}개 지점 중 {len(frames)}개 화면 자막을 읽었습니다 ({frames[0]["timestamp"]}~{frames[-1]["timestamp"]}). 표본 분석이며 전체 발언·음성 분석은 아닙니다. 캡처와 인용문을 대조하세요.']
-                return [], ['공개 자막과 화면 문구를 확보하지 못했습니다. 제목·설명·공개 댓글 기준이며 영상 발언 확인 불가.']
+                    db.log('analysis_progress', f'화면 {len(frames)}장과 자막 확인 중', video_id)
+                    texts = [[] for _ in images] if transcript else await asyncio.to_thread(services.ocr_frames, images, cancellation=cancellation)
+                    rows = transcript + [{**frame, 'text':' '.join(lines)} for frame, lines in zip(frames,texts)]
+                    cancellation.check()
+                    if len(frames) == 3:
+                        target = config.ROOT / 'local/cache/scenes' / (video_id + '.json')
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(json.dumps({'draft_version':7, 'warnings':[], 'captures':rows,
+                            'sources':[{'type':'title', 'text':video_data['title']}, {'type':'description', 'text':video_data['description'][:3000]}]}, ensure_ascii=False), encoding='utf-8')
+                    return rows, []
+                return transcript, []
+
             except PlaywrightError:
                 capture = await screenshot(target=reading)
                 db.log('evidence_failed', 'YouTube 영상 근거 조회 실패' + (f' · {capture}' if capture else ''), video_data['id'])

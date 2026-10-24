@@ -132,6 +132,23 @@ async def main():
             await page.locator('#draft').fill(draft)
             await page.get_by_role('button',name='수정 저장').click()
             result['checks'].append({'local_draft_recovery_without_approval':'passed'})
+            detail=await (await page.request.get(BASE+'/api/videos/FBGY7JIM-84')).json()
+            old={**detail,'analysis':{**detail['analysis'],'draft_version':0,'comment':edited,'generated_comment':draft}}
+            async def old_manual_draft(route):
+                await route.fulfill(json=old)
+            async def fresh_generated_draft(route):
+                await route.fulfill(json={**detail['analysis'],'comment':draft,'draft_version':10})
+            await page.route('**/api/videos/FBGY7JIM-84',old_manual_draft)
+            await page.route('**/api/videos/FBGY7JIM-84/analyze',fresh_generated_draft)
+            await page.evaluate("localStorage.removeItem('marketing-ai:draft:FBGY7JIM-84')")
+            await page.get_by_role('textbox',name='YouTube 영상 링크').fill('https://youtu.be/FBGY7JIM-84')
+            await page.get_by_role('button',name='링크 확인',exact=True).click()
+            await expect(page.locator('#draft')).to_have_value(edited)
+            assert not await page.get_by_role('checkbox').is_checked()
+            await page.unroute('**/api/videos/FBGY7JIM-84',old_manual_draft)
+            await page.unroute('**/api/videos/FBGY7JIM-84/analyze',fresh_generated_draft)
+            await page.locator('#draft').fill(draft)
+            result['checks'].append({'manual_draft_preserved_when_old_analysis_is_regenerated':'passed'})
             analysis_started=asyncio.Event()
             release_analysis=asyncio.Event()
 
@@ -161,6 +178,7 @@ async def main():
             await expect(dialog).not_to_be_visible()
             await expect(page.get_by_role('alert')).to_contain_text('검증용 분석 오류')
             await expect(page.locator('#draft')).to_have_value(draft)
+            await expect(page.locator('#draft-guidance')).to_contain_text('운명원 연애 사주에 대한 관심')
             await page.unroute('**/api/videos/FBGY7JIM-84/analyze')
             result['checks'].append({'analysis_loading_blocks_mouse_keyboard_and_unlocks_after_error_fixture':'passed'})
             rejected = await page.request.post(BASE + '/api/posting-jobs', data={

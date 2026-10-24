@@ -39,6 +39,15 @@ class InputRules(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(HTTPException):
                 video_id(url)
 
+    def test_thinking_about_fortune_reading_is_not_a_use_review(self):
+        for text in [
+            '연락이 왔다고 바로 다시 시작할 일인지는 생각해봤는데 아직 모르겠네요. 운명원 연애 사주엔 기다려도 될 인연인지 물어보고 싶어요.',
+            '운명원 연애 사주를 생각해 봤는데, 연락이 왔다고 바로 재회부터 기대하는 게 맞는 건지 궁금해서 한번 물어보고 싶어요.',
+        ]:
+            self.assertEqual(validate_comment(text), text)
+        with self.assertRaises(HTTPException):
+            validate_comment('운명원에서 연애 사주를 봤는데 정말 내 연애랑 잘 맞더라고요. 연락을 기다려도 되는 인연이라고 해서 정말 마음이 놓였어요.')
+
 
 class PostingRules(unittest.TestCase):
     def setUp(self):

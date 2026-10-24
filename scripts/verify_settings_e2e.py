@@ -67,6 +67,18 @@ async def verify():
                     assert await page.locator('.app-footer a[href="/api/health"]').count() == 0
                     assert await page.locator('a[href="/api/health"]').count() == 0
                     await expect(page.get_by_role('button', name='API 상태 확인', exact=True)).to_be_visible()
+                    await expect(page.locator('.api-connection')).to_contain_text('API 연결됨')
+                    health_requests = []
+                    page.on('request', lambda request: health_requests.append(request.url) if request.url.endswith('/api/health') else None)
+                    await page.reload()
+                    await expect(page.get_by_role('heading', name='환경 설정', exact=True)).to_be_visible()
+                    await expect(page.locator('.api-connection')).to_contain_text('API 연결됨')
+                    assert not health_requests, health_requests
+                    await page.evaluate('''()=>{const key='marketing-ai:health';const saved=JSON.parse(sessionStorage.getItem(key));saved.checkedAt=Date.now()-31000;sessionStorage.setItem(key,JSON.stringify(saved))}''')
+                    async with page.expect_response('**/api/health'):
+                        await page.reload()
+                    assert len(health_requests) == 1
+                    result['checks'].append('connection_cache_survives_reload_and_expires_after_30_seconds')
                     async with page.expect_response('**/api/health') as refreshed:
                         await page.get_by_role('button', name='API 상태 확인', exact=True).click()
                     assert (await refreshed.value).status == 200

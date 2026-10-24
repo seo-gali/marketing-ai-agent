@@ -221,8 +221,8 @@ async def post_comment(body: PostingRequest):
         if not services.allowed(video):
             raise HTTPException(403, '허용 채널 또는 등록된 본인 테스트 영상에만 게시할 수 있습니다.')
         grounded = db.get_analysis(video['id'])
-        if video['id'] not in config.TEST_IDS and (not grounded or not grounded.get('scene_verified')):
-            raise HTTPException(422, '영상 발언 근거를 확보한 뒤 댓글을 게시하세요.')
+        if video['id'] not in config.TEST_IDS and not grounded:
+            raise HTTPException(422, '영상의 제목·설명·댓글을 분석한 뒤 게시하세요.')
         if browser.lock.locked():
             raise HTTPException(409, '다른 Chrome 작업이 진행 중입니다.')
         db.save_videos([video])

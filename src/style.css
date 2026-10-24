@@ -61,12 +61,9 @@ summary{cursor:pointer;font-size:12px;color:#435d7c;padding:8px 0}
 .analysis-progress-track span{display:block;width:35%;height:100%;border-radius:inherit;background:var(--blue);animation:analysis-progress-slide 1.4s ease-in-out infinite}
 .analysis-progress>.btn{margin-top:20px}
 @keyframes analysis-progress-slide{from{transform:translateX(-100%)}to{transform:translateX(390%)}}
-.evidence-item{margin:15px 0 0}.evidence-source{display:inline-flex;align-items:center;gap:5px;font-size:11px;line-height:1.6}
-.evidence-item blockquote{margin:10px 0;padding-left:10px;border-left:2px solid var(--line);font-size:12px;line-height:1.8;color:var(--text)}
+.scene-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}.scene-grid figure{min-width:0;margin:0}.scene-grid figcaption{text-align:center;font-size:11px;color:var(--muted);margin-top:5px}
+.comment-guidance{margin:-3px 0 12px;color:var(--muted);font-size:12px;line-height:1.6}
 .evidence-capture{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;border:1px solid var(--line);border-radius:9px;background:var(--canvas)}
-.evidence-box .source-summary,.source-notes p{font-size:11px;color:var(--muted)}.source-notes{margin-top:12px}.source-notes summary{font-size:11px}
-.analysis-metadata-scroll{max-height:220px;overflow:auto;scrollbar-gutter:stable;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--canvas)}
-.analysis-metadata-scroll .video-description{margin-top:0}
 .skip-link{position:fixed;top:-100px;left:12px;z-index:100;background:#183f7c;color:white;padding:12px 20px;border-radius:6px}.skip-link:focus{top:12px}
 :focus-visible{outline:3px solid #245fc6!important;outline-offset:3px!important}#main-content:focus{outline:none}#analysis-title:focus{outline:2px solid #245fc6;outline-offset:4px}
 .not-found{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px}.error-code{font-size:66px;color:#2865ce;font-weight:850}.not-found h1{font-size:24px}.not-found p{font-size:13px;color:#526982}.crash-page{max-width:600px;margin:15vh auto;padding:24px}

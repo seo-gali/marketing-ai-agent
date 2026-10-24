@@ -56,7 +56,7 @@
 |---|---|---|
 | Frontend | React + TypeScript + Vite | 로컬 대시보드 |
 | Backend | Python + FastAPI | YouTube·AI·브라우저 작업 및 규칙 검증 |
-| AI | Ollama `qwen2.5-coder:7b` | 연애 고민 분석·댓글 초안 생성. 품질은 실영상으로 검증 |
+| AI | Ollama `qwen3.5:4b` | 연애 고민 분석·댓글 초안 생성. 품질은 실영상으로 검증 |
 | 영상 | YouTube Data API v3 | 목록·메타데이터·공개 댓글·채널 확인 |
 | Browser | Playwright Python + Chrome | Persistent Context, 가시적 타이핑·게시·확인 |
 | DB | SQLite | 게시 제한·분석·초안·실행 이력 |
@@ -70,7 +70,7 @@ OpenAI API, 임베딩, RAG, Redis, PostgreSQL, Celery, MCP, Multi-Agent는 **애
 ```dotenv
 YOUTUBE_API_KEY=
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5-coder:7b
+OLLAMA_MODEL=qwen3.5:4b
 DATABASE_URL=sqlite:///./data/marketing-agent.db
 CHROME_USER_DATA_DIR=./local/chrome-profiles/youtube1
 DAILY_MAX_COMMENTS=10
@@ -104,8 +104,8 @@ flowchart TD
 **수집·생성**
 
 - 채널별 최신 영상 목록과 선택 영상의 제목·설명·공개 인기 댓글을 조회한다.
-- 공개 자막 우선 수집, 실패 시 실제 화면 문구 확보. 현재 사용자 지시에 따라 발언 근거가 없으면 제목·설명만으로 초안 생성·게시 금지. 음성 전사 도구 추가는 별도 승인 후 검증.
-- 입력에 없는 장면·대사를 지어내지 않는다. 구체적 장면·발언을 확인할 수 없으면 `장면·발언 검증 불가`로 표시하고 F3의 미충족 여부를 기록한다.
+- 공개 자막 우선 수집, 미확보 시 영상 20%·50%·80%의 3장면·제목·설명·인기 댓글 활용. 장면·발언 창작 금지. 음성 수집·전사 제외. 설명·근거 더보기 제거.
+- 입력에 없는 장면·대사를 지어내지 않는다. 자막이 없으면 제목·설명과 인기 댓글을 활용하며, 실제로 확인한 자료 유형을 기록한다. 캡처 3장은 전체 영상 분석을 의미하지 않는다.
 - LLM은 고민 한 문장, 근거·출처, 댓글 초안을 구조화해 반환한다. 길이·금지 표현·운영 규칙은 서버에서 검사한다.
 - 원문은 영상을 본 시청자의 페르소나와 브랜드 관심 유도를 요구한다. 실제로 경험하지 않은 운명원 이용 후기는 작성하지 않는다.
 

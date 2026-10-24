@@ -25,6 +25,7 @@ async def main():
             await page.goto(BASE)
             await page.get_by_role('button',name='채널 추가',exact=True).click()
             for video_id in ['FBGY7JIM-84', 'DvxMfC_KjX0', 'VDflnx7Cn1o']:
+                selection_started = perf_counter()
                 await page.get_by_role('textbox', name='YouTube 영상 링크').fill('https://youtu.be/' + video_id)
                 async with page.expect_response(lambda response: response.url.endswith('/api/videos/resolve') and response.request.method == 'POST') as resolved:
                     await page.get_by_role('button', name='링크 확인', exact=True).click()
@@ -32,6 +33,17 @@ async def main():
                 assert metadata['id'] == video_id
                 await expect(page.locator('#analysis-title')).to_have_text(metadata['title'])
                 detail = await (await page.request.get(BASE + '/api/videos/' + video_id)).json()
+                old_captures = (detail['analysis'] or {}).get('captures', [])
+                generated_on_select = not detail['analysis'] or detail['analysis'].get('draft_version') != 10
+                if generated_on_select:
+                    async with asyncio.timeout(600):
+                        while video_id not in analysis_responses:
+                            await asyncio.sleep(.2)
+                    first = analysis_responses[video_id]
+                    assert first.ok, await first.text()
+                    detail = await (await page.request.get(BASE + '/api/videos/' + video_id)).json()
+                    await expect(page.get_by_role('button', name='초안 다시 생성', exact=True)).to_be_enabled(timeout=10000)
+                initial_seconds = round(perf_counter() - selection_started, 2)
                 if video_id == 'FBGY7JIM-84' and '--regenerate' in sys.argv and detail['analysis']:
                     previous = await page.locator('#draft').input_value()
                     await page.get_by_role('button', name='초안 다시 생성', exact=True).click()
@@ -54,9 +66,10 @@ async def main():
                     assert unchanged['analysis']['created_at'] == detail['analysis']['created_at']
                     result['real_cancellation'] = {'status': 'passed', 'seconds': round(perf_counter() - cancelling, 2), 'previous_draft_preserved': True}
                     analysis_responses.pop(video_id, None)
-                regenerate = '--regenerate' in sys.argv or not detail['analysis'] or detail['analysis'].get('draft_version') != 5
+                regenerate = '--regenerate' in sys.argv and not generated_on_select
                 started = perf_counter()
                 if detail['analysis'] and regenerate:
+                    analysis_responses.pop(video_id, None)
                     await page.get_by_role('button', name='초안 다시 생성', exact=True).click()
                 if regenerate:
                     async with asyncio.timeout(600):
@@ -66,49 +79,41 @@ async def main():
                     assert response.ok, await response.text()
                 await expect(page.locator('#draft')).to_have_value(re.compile('운명원'), timeout=10000)
                 await expect(page.get_by_role('button', name='초안 다시 생성', exact=True)).to_be_enabled(timeout=10000)
-                generation_seconds = round(perf_counter() - started, 2)
+                generation_seconds = initial_seconds if generated_on_select else round(perf_counter() - started, 2)
                 response = await page.request.get(BASE + '/api/videos/' + video_id)
                 assert response.status == 200
                 data = await response.json()
                 analysis = data['analysis']
                 await expect(page.locator('.concern-box')).to_have_text(analysis['concern'])
                 assert await page.locator('.concern-box').evaluate('element=>element.scrollHeight<=element.clientHeight+1')
-                assert analysis['scene_verified'], analysis['warnings']
-                assert analysis['source_basis'] in {'frame_ocr', 'transcript'}
+                assert analysis['source_basis'] in {'frame_ocr', 'transcript', 'metadata'}
                 comment = analysis['comment']
                 assert 40 <= len(comment) <= 120
                 assert not re.search(r'\[(?:광고|유료광고|협찬)\]', comment) and '운명원' in comment and '사주' in comment
-                assert analysis.get('draft_version') == 5
+                assert analysis.get('draft_version') == 10
                 assert '해결해' not in comment and '보장' not in comment and '콘텐츠 소개입니다' not in comment
-                source = next(item for item in analysis['sources'] if item['type'] in {'frame_ocr', 'transcript'} and item['id'] in analysis['source_ids'] and analysis['quote'] in item['text'])
-                seconds = 0
-                for part in source['timestamp'].split(':'):
-                    seconds = seconds * 60 + int(part)
-                assert f'&t={seconds}s' in analysis['evidence'][0]['url']
+                source = next(item for item in analysis['sources'] if item['id'] in analysis['source_ids'] and analysis['quote'] in item['text'])
+                if source.get('timestamp'):
+                    seconds = 0
+                    for part in source['timestamp'].split(':'):
+                        seconds = seconds * 60 + int(part)
+                    assert f'&t={seconds}s' in analysis['evidence'][0]['url']
                 assert not re.search(r'\d{1,2}:\d{2}|화면의|제목의|참고해 보세요', comment)
                 timed = [item for item in analysis['sources'] if item['type'] in {'frame_ocr', 'transcript'}]
+                captures = analysis.get('captures', [])
                 if video_id == 'FBGY7JIM-84':
-                    assert any(int(item['timestamp'].split(':')[0]) >= 8 for item in timed), timed
+                    assert any(int(item['timestamp'].split(':')[0]) >= 8 for item in captures), captures
                 if source.get('capture'):
                     assert (await page.request.get(BASE + '/api/screenshots/' + source['capture'])).status == 200
                     capture = page.locator('.evidence-capture').first
                     await capture.scroll_into_view_if_needed()
                     await expect(capture).to_have_js_property('complete', True)
                     assert await capture.evaluate('element=>element.naturalWidth>0')
-                await page.locator('.analysis-metadata summary').click()
-                description = page.get_by_role('region', name='영상 설명과 분석 정보', exact=True)
-                await expect(description).to_be_visible()
-                assert await description.evaluate('element=>element.clientHeight<=220&&getComputedStyle(element).overflowY==="auto"')
-                if video_id == 'FBGY7JIM-84':
-                    await description.focus()
-                    await page.keyboard.press('PageDown')
-                    async with asyncio.timeout(5):
-                        while await description.evaluate('element=>element.scrollTop') == 0:
-                            await asyncio.sleep(.05)
+                await expect(page.locator('.scene-grid figure')).to_have_count(3)
+                assert await page.locator('.analysis-metadata,.source-notes').count() == 0
                 assert not await page.get_by_role('checkbox').is_checked()
-                old_sources = detail['analysis'].get('sources', []) if detail['analysis'] else []
-                reused = bool(old_sources) and all(item in old_sources for item in timed)
-                result['videos'].append({'id': video_id, 'regenerated': video_id in analysis_responses, 'generation_seconds': generation_seconds, 'evidence_reused': reused, 'title': data['title'], 'concern': analysis['concern'], 'comment': comment, 'quote': analysis['quote'], 'source': source, 'warnings': analysis['warnings']})
+                reused = bool(captures) and captures == old_captures
+                result['videos'].append({'id': video_id, 'regenerated': generated_on_select or video_id in analysis_responses, 'generation_seconds': generation_seconds, 'evidence_reused': reused, 'title': data['title'], 'concern': analysis['concern'], 'comment': comment, 'quote': analysis['quote'], 'source': source, 'warnings': analysis['warnings']})
                 await page.screenshot(path=ROOT / 'artifacts' / f'grounded-{video_id}.png', full_page=True)
             assert result['videos'][0]['comment'] != result['videos'][1]['comment']
             for width in [1440, 390]:
